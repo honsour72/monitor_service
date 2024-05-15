@@ -1,0 +1,5 @@
+{
+  "show_server_status": 1,
+  "show_locks": 2,
+  "get_leveldb_stats": 3
+}
