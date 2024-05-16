@@ -1,0 +1,17 @@
+{
+    "debugNetworkSession": false,
+    "developerMode": true,
+    "diskSpaceMinFreePercent": 1,
+    "enableLogDebug": true,
+    "insertCompressors": 8,
+    "insertParsers": 8,
+    "nodeInfoLoggingSec": 0,
+    "reextentUse": false,
+    "showFullExceptionInfo": true,
+    "showInternalExceptionInfo": false,
+    "useClientLog": true,
+    "useMetadataServer": true,
+    "spoolMemoryGB" : 4,
+    "clientReconnectionTimeout": 10000,
+    "liveConnectionThreshold": 100000
+}

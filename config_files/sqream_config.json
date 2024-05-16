@@ -1,0 +1,11 @@
+{
+    "cudaMemQuota":0,
+    "gpu": 0,
+    "legacyConfigFilePath": "sqream_config_legacy.json",
+    "metadataServerIp": "127.0.0.1",
+    "metadataServerPort": 3105,
+    "port": 5000,
+    "useConfigIP": true,
+    "limitQueryMemoryGB" : 8,
+    "initialSubscribedServices": "monitor"
+}
