@@ -60,6 +60,27 @@ data_sources = {
         "max": float,
         "max_timestamp": str,
         "variance": float
+    },
+    "show_cluster_nodes": {
+        "server_ip": str,
+        "server_port": int,
+        "connection_id": int,
+        "instance_id": str,
+        "last_heartbeat": int,
+        "connection_status": str
+    },
+    "get_license_info": {
+         "compressed_cluster_size": int,
+         "uncompressed_cluster_size": int,
+         "compress_type": str,
+         "cluster_size_limit": int,
+         "expiration_date": str,
+         "is_date_expired": int,
+         "is_size_exceeded": int,
+         "cluster_size_left": int,
+         "data_read_size_limit": int,
+         "data_write_size_limit": int,
+         "gpu_limit": int
     }
 }
 
@@ -288,7 +309,7 @@ parser.add_argument('--timeout', metavar='timeout', type=int, nargs='?', help='M
 args = parser.parse_args()
 print(args)
 
-monitoring_tables = ["show_server_status", "show_locks", "get_leveldb_stats"]
+monitoring_tables = ["show_server_status", "show_locks", "get_leveldb_stats", "show_cluster_nodes", "get_license_info"]
 monitor_input = json.load(open("monitor_input.json"))
 pg_instance = PgInit(args.__dict__)
 sq_instance = SqInit(args.__dict__)
