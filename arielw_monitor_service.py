@@ -9,6 +9,7 @@ from colorama import Fore
 import inspect
 import argparse
 import os
+from prometheus_client import start_http_server, Counter
 
 sq_conn = ""
 
@@ -70,9 +71,6 @@ m_escaping_character_metrics = {
     "show_server_status": [list(data_sources["show_server_status"]).index('statement')],
     "show_locks": [list(data_sources["show_locks"]).index('statement_string')]
 }
-
-# class PrometheusInit:
-#     def 
 
 class SqInit:
     def __init__(self, args):
@@ -153,6 +151,7 @@ def fetchall(cur, i_metric):
     try:
         cur.execute(f"select {i_metric}()")
         result = cur.fetchall()
+        print(result)
         if len(result) > 0 and i_metric in m_escaping_character_metrics.keys():
             for row_idx, row in enumerate(result):
                 for col_idx, col in enumerate(row):
@@ -194,19 +193,26 @@ def pg_monitor(sq_instance, pg_instance, i_table):
         raise Exception(f"Unable to fill '{i_table}'. Error: " + str(e))
 
 
-def metric_scheduler(sq_instance, pg_instance, i_metric_table_name, i_freq_sec):
+def metric_scheduler(sq_instance, pg_instance, i_metric_table_name, i_freq_sec, dest):
     log("INFO", f"{i_metric_table_name} - JOB STARTED")
+    if dest == "prom":
+        #  PrometheusInit.set_up_prometheus()
+         while True:
+            time.sleep(i_freq_sec)
+            log("INFO", f"{i_metric_table_name} - METRIC STARTED")
+            # PrometheusInit.send_metrices(sq_instance, i_metric_table_name)
+            log("INFO", f"{i_metric_table_name} - METRIC ENDED")
+    else:
+        pg_instance.create_if_not_exist(i_metric_table_name)
+        while True:
+            time.sleep(i_freq_sec)
+            log("INFO", f"{i_metric_table_name} - METRIC STARTED")
+            pg_monitor(sq_instance, pg_instance, i_metric_table_name)
+            log("INFO", f"{i_metric_table_name} - METRIC ENDED")
 
-    pg_instance.create_if_not_exist(i_metric_table_name)
-    while True:
-        time.sleep(i_freq_sec)
-        log("INFO", f"{i_metric_table_name} - METRIC STARTED")
-        pg_monitor(sq_instance, pg_instance, i_metric_table_name)
-        log("INFO", f"{i_metric_table_name} - METRIC ENDED")
 
-
-def run_metric_scheduler(sq_instance, pg_instance, i_metric_name, i_freq_sec):
-    job_thread = threading.Thread(target=metric_scheduler, args=(sq_instance, pg_instance, i_metric_name, i_freq_sec,),
+def run_metric_scheduler(sq_instance, pg_instance, i_metric_name, i_freq_sec, dest):
+    job_thread = threading.Thread(target=metric_scheduler, args=(sq_instance, pg_instance, i_metric_name, i_freq_sec, dest,),
                                   name=i_metric_name + "_thread")
     job_thread.start()
 
@@ -235,8 +241,8 @@ def metric_deleter(pg_instance, i_freq_sec, i_kept_data_in_sec):
                     pg_conn.close()
 
 
-def run_deleter(i_freq_sec, i_kept_data_sec):
-    job_thread = threading.Thread(target=metric_deleter, args=(pg_instance, i_freq_sec, i_kept_data_sec,),
+def run_deleter(i_freq_sec, i_kept_data_sec, dest):
+    job_thread = threading.Thread(target=metric_deleter, args=(pg_instance, i_freq_sec, i_kept_data_sec, dest,),
                                   name="metric_deleter")
     job_thread.start()
 
@@ -285,26 +291,35 @@ parser.add_argument('--remote_user', metavar='remote_user', type=str, nargs='?',
                      default='postgres')
 parser.add_argument('--remote_password', metavar='remote_password', type=str, nargs='?', help='Remote password',
                     default='postgres11')
-
 parser.add_argument('--deleter_freq', metavar='deleter_freq', type=int, nargs='?', help='Deleter frequency (seconds)',
                     default=10)
 parser.add_argument('--deleter_kept_data', metavar='deleter_kept_data', type=int, nargs='?',
                     help='Deleter keep data of X seconds', default=30000)
+# parser.add_argument('--dest', metavar='destination source', help='set destination to send data to', required=True)
 
-parser.add_argument('--timeout', metavar='timeout', type=int, nargs='?', help='Monitor service timeout', default=0)
+# parser.add_arFgument('--timeout', metavar='timeout', type=int, nargs='?', help='Monitor service timeout', default=0)
 
 args = parser.parse_args()
 print(args)
+# dest = args.dest.lower()
 
 monitoring_tables = ["show_server_status", "show_locks", "get_leveldb_stats"]
 monitor_input = json.load(open(f"sqreamdb-monitor-service/monitor_input.json"))
-pg_instance = PgInit(args.__dict__)
+# pg_instance = PgInit(args.__dict__)
 sq_instance = SqInit(args.__dict__)
-deleter = Deleter(args.__dict__)
+# deleter = Deleter(args.__dict__)
 
-for metric in monitor_input.keys():
-    print(metric)
-    if metric not in monitoring_tables:
-        log("WARN", f"SCHEDULER - Metric '{metric}' not found in monitoring tables, probably wrong input")
-        continue
-    run_metric_scheduler(sq_instance, pg_instance, metric, monitor_input[metric])
+# for metric in monitor_input.keys():
+#     print(metric)
+#     if metric not in monitoring_tables:
+#         log("WARN", f"SCHEDULER - Metric '{metric}' not found in monitoring tables, probably wrong input")
+#         continue
+#     run_metric_scheduler(sq_instance, pg_instance, metric, monitor_input[metric], dest)
+sq_conn = sq_instance.connect()
+sq_cur = sq_conn.cursor()
+rows = fetchall(sq_cur, "show_server_status")
+print(rows)
+# for row in rows:
+#     print(row)
+#     for r in row:
+#         print(r)
