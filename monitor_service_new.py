@@ -145,8 +145,7 @@ def set_and_get_arguments():
     return parser.parse_args()
 
 
-def send_info_to_loki(sq_instance, metric_name: str, metric_execution_time: int):
-        loki_instance = LokiInit(loki_url)
+def send_info_to_loki(sq_instance, loki_instance, metric_name: str, metric_execution_time: int):
         monitor_metric = loki_instance.METRICS[metric_name]
         sq_conn = sq_instance.connect()
         sq_cur = sq_conn.cursor()
@@ -165,10 +164,11 @@ def monitor_service_manager(args, config_monitor_file):
 
     loki_url = f"http://{args.remote_ip}:{args.remote_port}/loki/api/v1/push"
     sq_instance = SqInit(args)
+    loki_instance = LokiInit(loki_url)
     keys_list = list(config_monitor_file.keys())
-    assert all(key in keys_list for key in LokiInit.METRICS), "One of the keys are not supported"
+    assert all(key in keys_list for key in loki_instance.METRICS), "One of the keys are not supported"
     for metric_name, metric_execution_time in config_monitor_file.items():
-        job_thread = threading.Thread(target=send_info_to_loki, args=(sq_instance, metric_name, metric_execution_time), name=metric_name + "_thread")
+        job_thread = threading.Thread(target=send_info_to_loki, args=(sq_instance, loki_instance, metric_name, metric_execution_time), name=metric_name + "_thread")
         job_thread.start()
 
 

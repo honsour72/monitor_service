@@ -12,7 +12,11 @@ class LokiInit:
     def __init__(self, loki_url):
         self.loki_url = loki_url
 
-    def create_log_entry(self, metric_lable, log_line):
+    def dict_to_log_line(self, data: dict):
+        """Convert a dictionary to a formatted log line."""
+        return json.dumps(data)
+    
+    def create_log_entry(self, metric_lable: dict, log_line):
         """Create a log entry for Loki."""
         timestamp = int(time.time() * 1e9)  # Convert to nanoseconds
         return {
@@ -25,7 +29,7 @@ class LokiInit:
                 }
             ]
         }
-
+    
     def push_logs_to_loki(self, log_entry):
         """Push logs to Loki."""
         headers = {
@@ -33,10 +37,6 @@ class LokiInit:
         }
         response = requests.post(self.loki_url, json=log_entry, headers=headers)
         response.raise_for_status()
-
-    def dict_to_log_line(self, data):
-        """Convert a dictionary to a formatted log line."""
-        return json.dumps(data)
 
     def send_metric_table_to_loki(self, metric_name: str, metric_info: dict):
         metric_lable = {'job': f"{metric_name}"}
@@ -132,3 +132,4 @@ class GetLicenseInfo(LokiInit):
          "gpu_limit": f"{metric_data[10]}",
         }
         return license_info_output
+    
