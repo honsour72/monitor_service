@@ -1,6 +1,5 @@
 import requests
 import time
-from datetime import datetime
 import json
 
 
@@ -49,7 +48,6 @@ class LokiInit:
 class ShowServerStatus(LokiInit):
     METRIC = 'show_server_status'
 
-    
     def get_metric_tuple(metric_data: tuple) -> tuple:
         server_status_output = {
             "service": f"{metric_data[0]}",
@@ -82,7 +80,7 @@ class ShowLocks(LokiInit):
                 "lock_mode": f"{metric_data[6]}",
                 "statement_start_time": f"{metric_data[7]}",
                 "lock_start_time": f"{metric_data[8]}"
-            }
+        }
         return show_locks_output
 
 class GetLeveldbStats(LokiInit):
@@ -99,5 +97,38 @@ class GetLeveldbStats(LokiInit):
                 "max": f"{metric_data[6]}",
                 "max_timestamp": f"{metric_data[7]}",
                 "variance": f"{metric_data[8]}",
-            }
+        }
         return leveldb_stats_output
+
+class ShowClusterNodes(LokiInit):
+    METRIC = 'show_cluster_nodes'
+
+    def get_metric_tuple(metric_data: tuple) -> tuple:
+        show_cluster_nodes_output = {
+        "server_ip": f"{metric_data[0]}",
+        "server_port": f"{metric_data[1]}",
+        "connection_id": f"{metric_data[2]}",
+        "instance_id": f"{metric_data[3]}",
+        "last_heartbeat": f"{metric_data[4]}",
+        "connection_status": f"{metric_data[5]}",
+        }
+        return show_cluster_nodes_output
+    
+class GetLicenseInfo(LokiInit):
+    METRIC = 'get_license_info'
+
+    def get_metric_tuple(metric_data: tuple) -> tuple:
+        license_info_output = {
+         "compressed_cluster_size": f"{metric_data[0]}",
+         "uncompressed_cluster_size": f"{metric_data[1]}",
+         "compress_type": f"{metric_data[2]}",
+         "cluster_size_limit": f"{metric_data[3]}",
+         "expiration_date": f"{metric_data[4]}",
+         "is_date_expired": f"{metric_data[5]}",
+         "is_size_exceeded": f"{metric_data[6]}",
+         "cluster_size_left": f"{metric_data[7]}",
+         "data_read_size_limit": f"{metric_data[8]}",
+         "data_write_size_limit": f"{metric_data[9]}",
+         "gpu_limit": f"{metric_data[10]}",
+        }
+        return license_info_output
