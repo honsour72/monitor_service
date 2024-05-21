@@ -3,9 +3,10 @@ import time
 from datetime import datetime
 import json
 
-# when init me i need to get loki_url
+
 class LokiInit:
     METRICS = {}
+
     def __init_subclass__(cls, **kwargs):
         cls.METRICS[cls.METRIC] = cls
 
@@ -33,7 +34,6 @@ class LokiInit:
         }
         response = requests.post(self.loki_url, json=log_entry, headers=headers)
         response.raise_for_status()
-        # print('Successfully pushed logs to Loki.')
 
     def dict_to_log_line(self, data):
         """Convert a dictionary to a formatted log line."""
@@ -45,10 +45,11 @@ class LokiInit:
         log_entry = self.create_log_entry(metric_lable, log_line)
         self.push_logs_to_loki(log_entry)
 
+
 class ShowServerStatus(LokiInit):
     METRIC = 'show_server_status'
 
-    @staticmethod
+    
     def get_metric_tuple(metric_data: tuple) -> tuple:
         server_status_output = {
             "service": f"{metric_data[0]}",
@@ -70,7 +71,6 @@ class ShowServerStatus(LokiInit):
 class ShowLocks(LokiInit):
     METRIC = 'show_locks'
 
-    @staticmethod
     def get_metric_tuple(metric_data: tuple) -> tuple:
         show_locks_output = {
                 "statement_id": f"{metric_data[0]}",
@@ -88,7 +88,6 @@ class ShowLocks(LokiInit):
 class GetLeveldbStats(LokiInit):
     METRIC = 'get_leveldb_stats'
 
-    @staticmethod
     def get_metric_tuple(metric_data: tuple) -> tuple:
         leveldb_stats_output = {
                 "timestamp": f"{metric_data[0]}",
