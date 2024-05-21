@@ -1,5 +1,5 @@
 {
-  "show_server_status": 1,
+  "show_server_status": 7,
   "show_locks": 2,
-  "get_leveldb_stats": 3
+  "get_leveldb_stats": 5
 }
