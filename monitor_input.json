@@ -1,5 +1,11 @@
 {
   "show_server_status": 7,
   "show_locks": 2,
+<<<<<<< HEAD
   "get_leveldb_stats": 5
+=======
+  "get_leveldb_stats": 3,
+  "show_cluster_nodes": 4,
+  "get_license_info": 5
+>>>>>>> origin/develop
 }
