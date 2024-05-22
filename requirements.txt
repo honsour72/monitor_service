@@ -4,3 +4,5 @@ packaging==24.0
 psycopg2==2.9.9
 pyarrow==16.1.0
 pysqream==5.0.0
+requests==2.24.0
+urllib3==1.26.6

@@ -48,7 +48,8 @@ class LokiInit:
 class ShowServerStatus(LokiInit):
     METRIC = 'show_server_status'
 
-    def get_metric_tuple(metric_data: tuple) -> tuple:
+    @staticmethod
+    def get_metric_tuple(metric_data: tuple) -> dict:
         server_status_output = {
             "service": f"{metric_data[0]}",
             "instance_id": f"{metric_data[1]}",
@@ -69,67 +70,71 @@ class ShowServerStatus(LokiInit):
 class ShowLocks(LokiInit):
     METRIC = 'show_locks'
 
-    def get_metric_tuple(metric_data: tuple) -> tuple:
+    @staticmethod
+    def get_metric_tuple(metric_data: tuple) -> dict:
         show_locks_output = {
-                "statement_id": f"{metric_data[0]}",
-                "statement_string": f"{metric_data[1]}",
-                "username": f"{metric_data[2]}",
-                "server": f"{metric_data[3]}",
-                "port": f"{metric_data[4]}",
-                "locked_object": f"{metric_data[5]}",
-                "lock_mode": f"{metric_data[6]}",
-                "statement_start_time": f"{metric_data[7]}",
-                "lock_start_time": f"{metric_data[8]}"
+            "statement_id": f"{metric_data[0]}",
+            "statement_string": f"{metric_data[1]}",
+            "username": f"{metric_data[2]}",
+            "server": f"{metric_data[3]}",
+            "port": f"{metric_data[4]}",
+            "locked_object": f"{metric_data[5]}",
+            "lock_mode": f"{metric_data[6]}",
+            "statement_start_time": f"{metric_data[7]}",
+            "lock_start_time": f"{metric_data[8]}"
         }
         return show_locks_output
 
 class GetLeveldbStats(LokiInit):
     METRIC = 'get_leveldb_stats'
 
-    def get_metric_tuple(metric_data: tuple) -> tuple:
+    @staticmethod
+    def get_metric_tuple(metric_data: tuple) -> dict:
         leveldb_stats_output = {
-                "timestamp": f"{metric_data[0]}",
-                "server_ip": f"{metric_data[1]}",
-                "server_port": f"{metric_data[2]}",
-                "msg": f"{metric_data[3]}",
-                "count": f"{metric_data[4]}",
-                "average": f"{metric_data[5]}",
-                "max": f"{metric_data[6]}",
-                "max_timestamp": f"{metric_data[7]}",
-                "variance": f"{metric_data[8]}",
+            "timestamp": f"{metric_data[0]}",
+            "server_ip": f"{metric_data[1]}",
+            "server_port": f"{metric_data[2]}",
+            "msg": f"{metric_data[3]}",
+            "count": f"{metric_data[4]}",
+            "average": f"{metric_data[5]}",
+            "max": f"{metric_data[6]}",
+            "max_timestamp": f"{metric_data[7]}",
+            "variance": f"{metric_data[8]}",
         }
         return leveldb_stats_output
 
 class ShowClusterNodes(LokiInit):
     METRIC = 'show_cluster_nodes'
 
-    def get_metric_tuple(metric_data: tuple) -> tuple:
+    @staticmethod
+    def get_metric_tuple(metric_data: tuple) -> dict:
         show_cluster_nodes_output = {
-        "server_ip": f"{metric_data[0]}",
-        "server_port": f"{metric_data[1]}",
-        "connection_id": f"{metric_data[2]}",
-        "instance_id": f"{metric_data[3]}",
-        "last_heartbeat": f"{metric_data[4]}",
-        "connection_status": f"{metric_data[5]}",
+            "server_ip": f"{metric_data[0]}",
+            "server_port": f"{metric_data[1]}",
+            "connection_id": f"{metric_data[2]}",
+            "instance_id": f"{metric_data[3]}",
+            "last_heartbeat": f"{metric_data[4]}",
+            "connection_status": f"{metric_data[5]}",
         }
         return show_cluster_nodes_output
     
 class GetLicenseInfo(LokiInit):
     METRIC = 'get_license_info'
 
-    def get_metric_tuple(metric_data: tuple) -> tuple:
+    @staticmethod
+    def get_metric_tuple(metric_data: tuple) -> dict:
         license_info_output = {
-         "compressed_cluster_size": f"{metric_data[0]}",
-         "uncompressed_cluster_size": f"{metric_data[1]}",
-         "compress_type": f"{metric_data[2]}",
-         "cluster_size_limit": f"{metric_data[3]}",
-         "expiration_date": f"{metric_data[4]}",
-         "is_date_expired": f"{metric_data[5]}",
-         "is_size_exceeded": f"{metric_data[6]}",
-         "cluster_size_left": f"{metric_data[7]}",
-         "data_read_size_limit": f"{metric_data[8]}",
-         "data_write_size_limit": f"{metric_data[9]}",
-         "gpu_limit": f"{metric_data[10]}",
+            "compressed_cluster_size": f"{metric_data[0]}",
+            "uncompressed_cluster_size": f"{metric_data[1]}",
+            "compress_type": f"{metric_data[2]}",
+            "cluster_size_limit": f"{metric_data[3]}",
+            "expiration_date": f"{metric_data[4]}",
+            "is_date_expired": f"{metric_data[5]}",
+            "is_size_exceeded": f"{metric_data[6]}",
+            "cluster_size_left": f"{metric_data[7]}",
+            "data_read_size_limit": f"{metric_data[8]}",
+            "data_write_size_limit": f"{metric_data[9]}",
+            "gpu_limit": f"{metric_data[10]}",
         }
         return license_info_output
     
