@@ -4,7 +4,7 @@ import time
 import json
 import threading
 import argparse
-from typing import Literal, List, Union
+from typing import Literal, List, Union, Any
 import logging
 import pysqream
 import colorlog
@@ -99,7 +99,7 @@ def set_and_get_arguments() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def send_info_to_loki(sq_instance, loki_instance, metric_name: str, metric_execution_time: int):
+def send_info_to_loki(sq_instance: Any, loki_instance: Any, metric_name: str, metric_execution_time: int):
         monitor_metric = loki_instance.METRICS[metric_name]
         sq_conn = sq_instance.connect()
         sq_cur = sq_conn.cursor()
