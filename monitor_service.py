@@ -1,322 +1,143 @@
 #!/usr/bin/env python
-import pysqream
-import psycopg2
-from datetime import datetime
+import argparse
 import json
+import logging
+import os
 import threading
 import time
-from colorama import Fore
-import inspect
-import argparse
+from typing import List, Union
 
-m_log_level_color = {
-    'INFO': Fore.WHITE,
-    'WARN': Fore.YELLOW,
-    'ERROR': Fore.RED,
-    'SUCCESS': Fore.GREEN
-}
+import colorlog
+import pysqream
+from pysqream.connection import Connection
+from pysqream.cursor import Cursor
 
-m_types = {
-    int: 'INT',
-    float: 'FLOAT',
-    str: 'TEXT',
-    datetime: 'TIMESTAMP9'  # Timestamp with milliseconds
-}
-
-data_sources = {
-    "show_server_status": {
-        "service": str,
-        "instance_id": str,
-        "connection_id": int,
-        "server_ip": str,
-        "server_port": int,
-        "database_name": str,
-        "user_name": str,
-        "client_ip": str,
-        "statement_id": int,
-        "statement": str,
-        "statement_start_time": str,
-        "statement_status": str,
-        "statement_status_start": str
-    },
-    "show_locks": {
-        "statement_id": str,
-        "statement_string": str,
-        "username": str,
-        "server": str,
-        "port": str,
-        "locked_object": str,
-        "lock_mode": str,
-        "statement_start_time": str,
-        "lock_start_time": str
-    },
-    "get_leveldb_stats": {
-        "timestamp": str,
-        "server_ip": str,
-        "server_port": int,
-        "msg": str,
-        "count": int,
-        "average": float,
-        "max": float,
-        "max_timestamp": str,
-        "variance": float
-    },
-    "show_cluster_nodes": {
-        "server_ip": str,
-        "server_port": int,
-        "connection_id": int,
-        "instance_id": str,
-        "last_heartbeat": int,
-        "connection_status": str
-    },
-    "get_license_info": {
-         "compressed_cluster_size": int,
-         "uncompressed_cluster_size": int,
-         "compress_type": str,
-         "cluster_size_limit": int,
-         "expiration_date": str,
-         "is_date_expired": int,
-         "is_size_exceeded": int,
-         "cluster_size_left": int,
-         "data_read_size_limit": int,
-         "data_write_size_limit": int,
-         "gpu_limit": int
-    }
-}
-
-m_escaping_character_metrics = {
-    "show_server_status": [list(data_sources["show_server_status"]).index('statement')],
-    "show_locks": [list(data_sources["show_locks"]).index('statement_string')]
-}
+from loki_interface import LokiInit
 
 
 class SqInit:
-    def __init__(self, args):
-        self.ip = args['sqream_ip']
-        self.port = args['sqream_port']
-        self.database = args['sqream_database']
-        self.user = args['sqream_user']
-        self.password = args['sqream_password']
-        self.clustered = args['sqream_clustered']
-        self.service = args['sqream_service']
-        print(self.ip)
+    def __init__(self, args: argparse.Namespace):
+        self.ip = args.sqream_ip
+        self.port = args.sqream_port
+        self.database = args.sqream_database
+        self.user = args.sqream_user
+        self.password = args.sqream_password
+        self.clustered = args.sqream_clustered
+        self.service = args.sqream_service
 
-    def connect(self):
-        # print(Fore.WHITE, "SQConnection OPENED")
+    def connect(self) -> Connection:
         try:
-            conn = pysqream.connect(host=self.ip, port=self.port, database=self.database
-                                    , username=self.user, password=self.password
-                                    , clustered=self.clustered, service=self.service)
+            conn = pysqream.connect(
+                host=self.ip,
+                port=self.port,
+                database=self.database,
+                username=self.user,
+                password=self.password,
+                clustered=self.clustered,
+                service=self.service
+            )
+
             return conn
         except Exception as e:
-            raise Exception(Fore.RED, f"Unable to connect to Sqream: {str(e)}")
+            logging.error(f"Unable to connect to Sqream: {str(e)}")
 
-
-class PgInit:
-    def __init__(self, args):
-        self.server = args['remote_server']
-        self.ip = args['remote_ip']
-        self.port = args['remote_port']
-        self.database = args['remote_database']
-        self.user = args['remote_user']
-        self.password = args['remote_password']
-
-    def connect(self):
-        # print(Fore.WHITE, "PGConnection OPENED")
+    @staticmethod
+    def fetchall(cur: Cursor, metric: str) -> List[Union[tuple, None]]:
+        result = []
         try:
-            conn = psycopg2.connect(user=self.user,
-                                    password=self.password,
-                                    host=self.ip,
-                                    port=self.port,
-                                    database=self.database)
-            return conn
+            cur.execute(f"select {metric}()")
+            result = cur.fetchall()
         except Exception as e:
-            raise Exception(Fore.RED, f"Unable to connect to Postgres: {str(e)}")
-
-    def create_if_not_exist(self, i_table):
-        pg_conn = self.connect()
-        cur = pg_conn.cursor()
-        table_columns = data_sources[i_table]
-        try:
-            lst = []
-            for x in table_columns:
-                pg_col = x + " " + m_types[type(x)]
-                lst.append(pg_col)
-            stmt = "create table " + i_table + "( metric_time timestamp, " + ','.join([x for x in lst]) + ");"
-            cur.execute(stmt)
-            pg_conn.commit()
-        except Exception as e:
-            log('WARN', str("Could not create table " + i_table + ". " + str(e)))
+            logging.error(f"Unable to fetch from Sqream: {str(e)}")
         finally:
-            pg_conn.close()
+            cur.close()
+            return result
 
 
-class Deleter:
-    def __init__(self, args):
-        self.frequency = args['deleter_freq']
-        self.kept_data = args['deleter_kept_data']
-        run_deleter(self.frequency, self.kept_data)
+def set_logger():
+    handler = colorlog.StreamHandler()
+    handler.setFormatter(colorlog.ColoredFormatter(
+        '%(log_color)s%(asctime)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S',
+        log_colors={
+            'DEBUG': 'cyan',
+            'INFO': 'white',
+            'WARNING': 'yellow',
+            'ERROR': 'red',
+            'CRITICAL': 'bold_red',
+        }
+    ))
+
+    logger = colorlog.getLogger()
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
 
 
-def log(i_log_level, i_log_message):
-    if i_log_level not in m_log_level_color.keys():
-        raise Exception(i_log_level + ' is not a valid log level')
-    print(m_log_level_color[i_log_level], ','.join(
-        (datetime.now().strftime('%Y-%m-%d %H:%M:%S'), i_log_level, inspect.stack()[1][3].upper(), i_log_message)))
+def set_and_get_arguments() -> argparse.Namespace:
+    """
+    Sqream connection parameters include:
+    * IP/Hostname
+    * Port
+    * database name
+    * username
+    * password 
+    * Connect through load balancer, or direct to worker (Default: false - direct to worker)
+    * use SSL connection (default: false)
+    * Optional service queue (default: 'sqream')
+
+    Loki's connection parameters:
+    * remote_ip 
+    """
+    parser = argparse.ArgumentParser(description='Process some integers.')
+    parser.add_argument('--sqream_ip', type=str, help='Specify Sqream ip address', default='192.168.4.25')
+    parser.add_argument('--sqream_port', type=int, help='Specify Sqream port', default=5000)
+    parser.add_argument('--sqream_database', type=str, help='Specify Sqream database', default='master')
+    parser.add_argument('--sqream_user', type=str, help='Specify Sqream user', default='sqream')
+    parser.add_argument('--sqream_password', type=str, help='Specify Sqream password', default='sqream')
+    parser.add_argument('--sqream_clustered', action='store_true', help='Specify Sqream clustered')
+    parser.add_argument('--sqream_service', type=str, help='Specify Sqream service (Default: \'monitor\')',
+                        default='monitor')
+    parser.add_argument('--remote_ip', type=str, help='Specify Loki remote ip address', default='127.0.0.1')
+    parser.add_argument('--remote_port', type=int, help='Specify Loki remote port', default="3100")
+
+    return parser.parse_args()
 
 
-def fetchall(cur, i_metric):
-    try:
-        cur.execute(f"select {i_metric}()")
-        result = cur.fetchall()
-        if len(result) > 0 and i_metric in m_escaping_character_metrics.keys():
-            for row_idx, row in enumerate(result):
-                for col_idx, col in enumerate(row):
-                    if col_idx in m_escaping_character_metrics[i_metric]:
-                        # print("-- ESCAPE POSITION:",str(col_idx))
-                        tmp_lst = list(row)
-                        tmp_lst[col_idx] = row[col_idx].replace("\"", "\'").replace("\'", "\'\'")
-                        result[row_idx] = tuple(tmp_lst)
-        return result
-    except Exception as e:
-        raise Exception(f"Unable to fetch from Sqream: {str(e)}")
+def send_info_to_loki(sq_instance: SqInit, loki_instance: LokiInit, metric_name: str, metric_execution_time: int):
+    monitor_metric = loki_instance.METRICS[metric_name]
+    sq_conn = sq_instance.connect()
+    sq_cur = sq_conn.cursor()
+    info_about_metric = sq_instance.fetchall(sq_cur, metric_name)
 
-
-def pg_monitor(sq_instance, pg_instance, i_table):
-    try:
-        sq_conn = sq_instance.connect()
-        pg_conn = pg_instance.connect()
-        pq_cur = pg_conn.cursor()
-        sq_cur = sq_conn.cursor()
-        rows = fetchall(sq_cur, i_table)
-        if len(rows) > 0:
-            rows = [(datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3],) + row for row in rows]
-            res = ','.join(f"{x}" for x in rows).replace("\"", "\'")
-            postgres_insert_query = f"INSERT INTO {i_table} VALUES " + res + ";"
-            # print(postgres_insert_query)
-            pq_cur.execute(postgres_insert_query)
-            pg_conn.commit()
-            count = pq_cur.rowcount
-            log("SUCCESS", str(f"{i_table} - {count} Records INSERTED successfully !"))
-        else:
-            log("INFO", str(f"{i_table} - 0 Records"))
-        pg_conn.close()
-        sq_conn.close()
-    except Exception as e:
-        if not sq_conn.cur_closed:
-            sq_conn.close()
-        if pg_conn.closed:
-            pg_conn.close()
-        raise Exception(f"Unable to fill '{i_table}'. Error: " + str(e))
-
-
-def metric_scheduler(sq_instance, pg_instance, i_metric_table_name, i_freq_sec):
-    log("INFO", f"{i_metric_table_name} - JOB STARTED")
-
-    pg_instance.create_if_not_exist(i_metric_table_name)
     while True:
-        time.sleep(i_freq_sec)
-        log("INFO", f"{i_metric_table_name} - METRIC STARTED")
-        pg_monitor(sq_instance, pg_instance, i_metric_table_name)
-        log("INFO", f"{i_metric_table_name} - METRIC ENDED")
+        logging.info(f"{metric_name} - METRIC STARTED - {len(info_about_metric)} ROWS FOUND")
+        for m_info in info_about_metric:
+            loki_instance.send_metric_table_to_loki(metric_name, monitor_metric.get_metric(m_info))
+        logging.debug(f"SUCCEED - {metric_name} - METRIC ENDED - INSERTED SUCCESSFULLY")
+        time.sleep(metric_execution_time)
 
 
-def run_metric_scheduler(sq_instance, pg_instance, i_metric_name, i_freq_sec):
-    job_thread = threading.Thread(target=metric_scheduler, args=(sq_instance, pg_instance, i_metric_name, i_freq_sec,),
-                                  name=i_metric_name + "_thread")
-    job_thread.start()
+def monitor_service_manager(args: argparse.Namespace, config_monitor_file: dict[str, int]):
+    loki_url = f"http://{args.remote_ip}:{args.remote_port}/loki/api/v1/push"  # noqa
+    sq_instance = SqInit(args)
+    loki_instance = LokiInit(loki_url)
+    unsupported_keys = [key for key in config_monitor_file.keys() if key not in loki_instance.METRICS]
+    assert not unsupported_keys, f"Unsupported keys found: {unsupported_keys}"
+    for metric_name, metric_execution_time in config_monitor_file.items():
+        job_thread = threading.Thread(target=send_info_to_loki,
+                                      args=(sq_instance, loki_instance, metric_name, metric_execution_time),
+                                      name=metric_name + "_thread")
+        job_thread.start()
 
 
-def metric_deleter(pg_instance, i_freq_sec, i_kept_data_in_sec):
-    log("INFO", "JOB STARTED")
-    while True:
-        time.sleep(i_freq_sec)
-        for metric_table_name in data_sources.keys():
-            try:
-                log("INFO", f"{metric_table_name} - STARTED")
-                pg_conn = pg_instance.connect()
-                pg_cur = pg_conn.cursor()
-                delete_stmt = (f"delete from {metric_table_name} where metric_time < NOW()::timestamp - INTERVAL '"
-                               f"{str(i_kept_data_in_sec)} seconds'")
-                pg_cur.execute(delete_stmt)
-                deleted_res = pg_cur.rowcount
-                log_level = "SUCCESS" if deleted_res > 0 else "INFO"
-                log(log_level, f"{metric_table_name} - {str(deleted_res)} records DELETED successfully !")
-                pg_conn.commit()
-                log("INFO", f"{metric_table_name} - ENDED")
-                pg_conn.close()
-            except Exception as e:
-                log("ERROR", f"Unable to delete data from table: {metric_table_name}. Error: " + str(e))
-                if pg_conn.closed:
-                    pg_conn.close()
+def main():
+    set_logger()
+    logging.warning('monitor service started')
+    args = set_and_get_arguments()
+    logging.info(f"{args}")
+    config_monitor_file: dict[str, int] = json.load(open(f"{os.getcwd()}/monitor_input.json"))
+    monitor_service_manager(args, config_monitor_file)
 
 
-def run_deleter(i_freq_sec, i_kept_data_sec):
-    job_thread = threading.Thread(target=metric_deleter, args=(pg_instance, i_freq_sec, i_kept_data_sec,),
-                                  name="metric_deleter")
-    job_thread.start()
-
-
-def timeout(i_sec):
-    for i in range(i_sec):
-        time.sleep(1)
-
-
-""""------------------------------------------------------------"""
-"""
-Connection parameters include:
-* IP/Hostname
-* Port
-* database name
-* username
-* password 
-* Connect through load balancer, or direct to worker (Default: false - direct to worker)
-* use SSL connection (default: false)
-* Optional service queue (default: 'sqream')
-"""
-parser = argparse.ArgumentParser(description='Process some integers.')
-parser.add_argument('--sqream_ip', metavar='sqream_ip', type=str, nargs='?', help='Sqream IP address',
-                    default='127.0.0.1')
-parser.add_argument('--sqream_port', metavar='sqream_port', type=int, nargs='+', help='Sqream Port', default=5000)
-parser.add_argument('--sqream_database', metavar='sqream_database', type=str, nargs='?', help='Sqream Database',
-                    default='master')
-parser.add_argument('--sqream_user', metavar='sqream_user', type=str, nargs='?', help='Sqream user', default='sqream')
-parser.add_argument('--sqream_password', metavar='sqream_password', type=str, nargs='?', help='Sqream password',
-                    default='sqream')
-parser.add_argument('--sqream_clustered', metavar='sqream_clustered', type=bool, nargs='?', help='Sqream clustered',
-                    default=False)
-parser.add_argument('--sqream_service', metavar='sqream_service', type=str, nargs='?',
-                    help='Sqream service (Default: \'monitor\')', default='monitor')
-
-parser.add_argument('--remote_server', metavar='remote_server', type=str, nargs='?', help='Remote server (pgsql/mysql)',
-                    default='pgsql')
-parser.add_argument('--remote_ip', metavar='remote_ip', type=str, nargs='?', help='Remote IP address',
-                    default='127.0.0.1')
-parser.add_argument('--remote_port', metavar='remote_port', type=int, nargs='?', help='Remote Port', default=5432)
-parser.add_argument('--remote_database', metavar='remote_database', type=str, nargs='?', help='Remote Database',
-                    default='mysqloaddb')
-parser.add_argument('--remote_user', metavar='remote_user', type=str, nargs='?', help='Remote user', default='michaelr')
-parser.add_argument('--remote_password', metavar='remote_password', type=str, nargs='?', help='Remote password',
-                    default='michaelr11')
-
-parser.add_argument('--deleter_freq', metavar='deleter_freq', type=int, nargs='?', help='Deleter frequency (seconds)',
-                    default=10)
-parser.add_argument('--deleter_kept_data', metavar='deleter_kept_data', type=int, nargs='?',
-                    help='Deleter keep data of X seconds', default=30000)
-
-parser.add_argument('--timeout', metavar='timeout', type=int, nargs='?', help='Monitor service timeout', default=0)
-
-args = parser.parse_args()
-print(args)
-
-monitoring_tables = ["show_server_status", "show_locks", "get_leveldb_stats", "show_cluster_nodes", "get_license_info"]
-monitor_input = json.load(open("monitor_input.json"))
-pg_instance = PgInit(args.__dict__)
-sq_instance = SqInit(args.__dict__)
-deleter = Deleter(args.__dict__)
-
-for metric in monitor_input.keys():
-    if metric not in monitoring_tables:
-        log("WARN", f"SCHEDULER - Metric '{metric}' not found in monitoring tables, probably wrong input")
-        continue
-    run_metric_scheduler(sq_instance, pg_instance, metric, monitor_input[metric])
+if __name__ == '__main__':
+    main()
