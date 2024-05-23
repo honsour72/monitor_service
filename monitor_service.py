@@ -1,16 +1,18 @@
 #!/usr/bin/env python
-import os
-import time
-import json
-import threading
 import argparse
-from typing import List, Union
+import json
 import logging
-import pysqream
+import os
+import threading
+import time
+from typing import List, Union
+
 import colorlog
-from loki_interface import LokiInit
+import pysqream
 from pysqream.connection import Connection
 from pysqream.cursor import Cursor
+
+from loki_interface import LokiInit
 
 
 class SqInit:
@@ -23,23 +25,24 @@ class SqInit:
         self.clustered = args.sqream_clustered
         self.service = args.sqream_service
 
-    def connect(self) -> type[Connection]:
+    def connect(self) -> Connection:
         try:
             conn = pysqream.connect(
                 host=self.ip,
                 port=self.port,
-                database=self.database, 
-                username=self.user, 
-                password=self.password, 
+                database=self.database,
+                username=self.user,
+                password=self.password,
                 clustered=self.clustered,
                 service=self.service
             )
 
             return conn
         except Exception as e:
-            logging.error( f"Unable to connect to Sqream: {str(e)}")
-        
-    def fetchall(self, cur: type[Cursor], metric: str) -> List[Union[tuple, None]]: 
+            logging.error(f"Unable to connect to Sqream: {str(e)}")
+
+    @staticmethod
+    def fetchall(cur: Cursor, metric: str) -> List[Union[tuple, None]]:
         result = []
         try:
             cur.execute(f"select {metric}()")
@@ -82,24 +85,25 @@ def set_and_get_arguments() -> argparse.Namespace:
     * use SSL connection (default: false)
     * Optional service queue (default: 'sqream')
 
-    Loki connection parameters:
+    Loki's connection parameters:
     * remote_ip 
     """
     parser = argparse.ArgumentParser(description='Process some integers.')
     parser.add_argument('--sqream_ip', type=str, help='Specify Sqream ip address', default='192.168.4.25')
-    parser.add_argument('--sqream_port', type=int, help='Specify Sqream port', default=5000)                    
-    parser.add_argument('--sqream_database', type=str, help='Specify Sqream database', default='master')                    
-    parser.add_argument('--sqream_user', type=str, help='Specify Sqream user', default='sqream')                     
-    parser.add_argument('--sqream_password', type=str, help='Specify Sqream password', default='sqream')                     
-    parser.add_argument('--sqream_clustered', action='store_true' ,help='Specify Sqream clustered')                        
-    parser.add_argument('--sqream_service', type=str, help='Specify Sqream service (Default: \'monitor\')', default='monitor')                        
+    parser.add_argument('--sqream_port', type=int, help='Specify Sqream port', default=5000)
+    parser.add_argument('--sqream_database', type=str, help='Specify Sqream database', default='master')
+    parser.add_argument('--sqream_user', type=str, help='Specify Sqream user', default='sqream')
+    parser.add_argument('--sqream_password', type=str, help='Specify Sqream password', default='sqream')
+    parser.add_argument('--sqream_clustered', action='store_true', help='Specify Sqream clustered')
+    parser.add_argument('--sqream_service', type=str, help='Specify Sqream service (Default: \'monitor\')',
+                        default='monitor')
     parser.add_argument('--remote_ip', type=str, help='Specify Loki remote ip address', default='127.0.0.1')
     parser.add_argument('--remote_port', type=int, help='Specify Loki remote port', default="3100")
-                        
+
     return parser.parse_args()
 
 
-def send_info_to_loki(sq_instance: type[SqInit], loki_instance: type[LokiInit], metric_name: str, metric_execution_time: int):
+def send_info_to_loki(sq_instance: SqInit, loki_instance: LokiInit, metric_name: str, metric_execution_time: int):
     monitor_metric = loki_instance.METRICS[metric_name]
     sq_conn = sq_instance.connect()
     sq_cur = sq_conn.cursor()
@@ -108,20 +112,20 @@ def send_info_to_loki(sq_instance: type[SqInit], loki_instance: type[LokiInit], 
     while True:
         logging.info(f"{metric_name} - METRIC STARTED - {len(info_about_metric)} ROWS FOUND")
         for m_info in info_about_metric:
-            loki_instance.send_metric_table_to_loki(metric_name, monitor_metric.get_metric_tuple(m_info))  
-        logging.debug(f"SUCCEED - {metric_name} - METRIC ENDED - INSERTED SUCCSESFULLY")  
+            loki_instance.send_metric_table_to_loki(metric_name, monitor_metric.get_metric(m_info))
+        logging.debug(f"SUCCEED - {metric_name} - METRIC ENDED - INSERTED SUCCESSFULLY")
         time.sleep(metric_execution_time)
 
 
-def monitor_service_manager(args: argparse.Namespace, config_monitor_file: dict):
-    loki_url = f"http://{args.remote_ip}:{args.remote_port}/loki/api/v1/push"
+def monitor_service_manager(args: argparse.Namespace, config_monitor_file: dict[str, int]):
+    loki_url = f"http://{args.remote_ip}:{args.remote_port}/loki/api/v1/push"  # noqa
     sq_instance = SqInit(args)
     loki_instance = LokiInit(loki_url)
     unsupported_keys = [key for key in loki_instance.METRICS if key not in list(config_monitor_file.keys())]
     assert not unsupported_keys, f"Unsupported keys found: {unsupported_keys}"
     for metric_name, metric_execution_time in config_monitor_file.items():
-        job_thread = threading.Thread(target=send_info_to_loki, 
-                                      args=(sq_instance, loki_instance, metric_name, metric_execution_time), 
+        job_thread = threading.Thread(target=send_info_to_loki,
+                                      args=(sq_instance, loki_instance, metric_name, metric_execution_time),
                                       name=metric_name + "_thread")
         job_thread.start()
 
@@ -131,7 +135,7 @@ def main():
     logging.warning('monitor service started')
     args = set_and_get_arguments()
     logging.info(f"{args}")
-    config_monitor_file: dict = json.load(open(f"{os.getcwd()}/monitor_input.json"))
+    config_monitor_file: dict[str, int] = json.load(open(f"{os.getcwd()}/monitor_input.json"))
     monitor_service_manager(args, config_monitor_file)
 
 
