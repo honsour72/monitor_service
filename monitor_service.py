@@ -9,6 +9,9 @@ import logging
 import pysqream
 import colorlog
 from loki_interface import LokiInit
+from pysqream.connection import Connection
+from pysqream.cursor import Cursor
+
 
 sq_conn = ""
 
@@ -23,7 +26,7 @@ class SqInit:
         self.clustered = args.sqream_clustered
         self.service = args.sqream_service
 
-    def connect(self):
+    def connect(self) -> type[Connection]:
         try:
             conn = pysqream.connect(
                 host=self.ip,
@@ -39,7 +42,7 @@ class SqInit:
         except Exception as e:
             logging.error( f"Unable to connect to Sqream: {str(e)}")
         
-    def fetchall(self, cur, metric: str) -> List[Union[tuple, None]]: 
+    def fetchall(self, cur: type[Cursor], metric: str) -> List[Union[tuple, None]]: 
         result = []
         try:
             cur.execute(f"select {metric}()")
@@ -99,19 +102,18 @@ def set_and_get_arguments() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def send_info_to_loki(sq_instance: Any, loki_instance: Any, metric_name: str, metric_execution_time: int):
-        monitor_metric = loki_instance.METRICS[metric_name]
-        sq_conn = sq_instance.connect()
-        sq_cur = sq_conn.cursor()
-        info_about_metric = sq_instance.fetchall(sq_cur, metric_name)
+def send_info_to_loki(sq_instance: type[SqInit], loki_instance: type[LokiInit], metric_name: str, metric_execution_time: int):
+    monitor_metric = loki_instance.METRICS[metric_name]
+    sq_conn = sq_instance.connect()
+    sq_cur = sq_conn.cursor()
+    info_about_metric = sq_instance.fetchall(sq_cur, metric_name)
 
-       
-        while True:
-            logging.info(f"{metric_name} - METRIC STARTED - {len(info_about_metric)} ROWS FOUND")
-            for m_info in info_about_metric:
-                loki_instance.send_metric_table_to_loki(metric_name, monitor_metric.get_metric_tuple(m_info))  
-            logging.debug(f"SUCCEED - {metric_name} - METRIC ENDED - INSERTED SUCCSESFULLY")  
-            time.sleep(metric_execution_time)
+    while True:
+        logging.info(f"{metric_name} - METRIC STARTED - {len(info_about_metric)} ROWS FOUND")
+        for m_info in info_about_metric:
+            loki_instance.send_metric_table_to_loki(metric_name, monitor_metric.get_metric_tuple(m_info))  
+        logging.debug(f"SUCCEED - {metric_name} - METRIC ENDED - INSERTED SUCCSESFULLY")  
+        time.sleep(metric_execution_time)
 
 
 def monitor_service_manager(args: argparse.Namespace, config_monitor_file: dict):
