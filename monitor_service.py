@@ -3,24 +3,14 @@ import os
 import time
 import json
 import threading
-import inspect
 import argparse
-import logging
 from typing import Literal, List, Union
-from datetime import datetime
+import logging
 import pysqream
-from colorama import Fore, Style
+import colorlog
 from loki_interface import LokiInit
 
-
 sq_conn = ""
-m_log_level_color = {
-    'DEBUG': Fore.BLUE,
-    'INFO': Fore.WHITE,
-    'WARNING': Fore.YELLOW,
-    'ERROR': Fore.RED,
-    'SUCCEED': Fore.GREEN,
-}
 
 
 class SqInit:
@@ -49,10 +39,10 @@ class SqInit:
         except Exception as e:
             logging.error( f"Unable to connect to Sqream: {str(e)}")
         
-    def fetchall(self, cur, i_metric: str) -> List[Union[tuple, None]]: 
+    def fetchall(self, cur, metric: str) -> List[Union[tuple, None]]: 
         result = []
         try:
-            cur.execute(f"select {i_metric}()")
+            cur.execute(f"select {metric}()")
             result = cur.fetchall()
         except Exception as e:
             logging.error(f"Unable to fetch from Sqream: {str(e)}")
@@ -62,33 +52,22 @@ class SqInit:
 
 
 def set_logger():
-    logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
-)
+    handler = colorlog.StreamHandler()
+    handler.setFormatter(colorlog.ColoredFormatter(
+        '%(log_color)s%(asctime)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S',
+        log_colors={
+            'DEBUG': 'cyan',
+            'INFO': 'white',
+            'WARNING': 'yellow',
+            'ERROR': 'red',
+            'CRITICAL': 'bold_red',
+        }
+    ))
 
-#TODO: change to Logger.{status} remove it , change all i_variable names 
-
-def log(i_log_level: str, i_log_message: str):
-    logger = logging.getLogger()
-    if i_log_level not in m_log_level_color:
-        raise ValueError(f'{i_log_level} is not a valid log level')
-
-    calling_function = inspect.stack()[1][3].upper()
-    log_message = f'{calling_function} - {i_log_message}'
-    colored_message = f'{m_log_level_color[i_log_level]}{log_message}{Style.RESET_ALL}'
-
-    if i_log_level == 'DEBUG':
-        logger.debug(colored_message)
-    elif i_log_level == 'INFO':
-        logger.info(colored_message)
-    elif i_log_level == 'WARNING':
-        logger.warning(colored_message)
-    elif i_log_level == 'ERROR':
-        logger.error(colored_message)
-    elif i_log_level == 'SUCCEED':
-        logger.info(colored_message)
+    logger = colorlog.getLogger()
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
 
 
 def set_and_get_arguments() -> argparse.Namespace:
@@ -128,11 +107,10 @@ def send_info_to_loki(sq_instance, loki_instance, metric_name: str, metric_execu
 
        
         while True:
-            # logging.info(f"{metric_name} - METRIC STARTED - {len(info_about_metric)} ROWS FOUND")
-            log("INFO", f"{metric_name} - METRIC STARTED - {len(info_about_metric)} ROWS FOUND")
+            logging.info(f"{metric_name} - METRIC STARTED - {len(info_about_metric)} ROWS FOUND")
             for m_info in info_about_metric:
-                loki_instance.send_metric_table_to_loki(metric_name, monitor_metric.get_metric_tuple(m_info))
-            log("SUCCEED", f"{metric_name} - METRIC ENDED - INSERTED SUCCSESFULLY")   
+                loki_instance.send_metric_table_to_loki(metric_name, monitor_metric.get_metric_tuple(m_info))  
+            logging.debug(f"SUCCEED - {metric_name} - METRIC ENDED - INSERTED SUCCSESFULLY")  
             time.sleep(metric_execution_time)
 
 
@@ -151,14 +129,12 @@ def monitor_service_manager(args: argparse.Namespace, config_monitor_file: dict)
 
 def main():
     set_logger()
+    logging.warning('monitor service started')
     args = set_and_get_arguments()
-    # logging.info(f"{args}")
-    log("INFO", f"{args}")
+    logging.info(f"{args}")
     config_monitor_file: dict = json.load(open(f"{os.getcwd()}/monitor_input.json"))
     monitor_service_manager(args, config_monitor_file)
 
 
 if __name__ == '__main__':
-    # logging.info('monitor service started')
-    log("INFO", 'monitor service started')
     main()
