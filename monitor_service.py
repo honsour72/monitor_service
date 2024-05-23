@@ -21,53 +21,10 @@ m_log_level_color = {
     'ERROR': Fore.RED,
     'SUCCEED': Fore.GREEN,
 }
-data_sources = {
-    "show_server_status": {
-        "service": str,
-        "instance_id": str,
-        "connection_id": int,
-        "server_ip": str,
-        "server_port": int,
-        "database_name": str,
-        "user_name": str,
-        "client_ip": str,
-        "statement_id": int,
-        "statement": str,
-        "statement_start_time": str,
-        "statement_status": str,
-        "statement_status_start": str
-    },
-    "show_locks": {
-        "statement_id": str,
-        "statement_string": str,
-        "username": str,
-        "server": str,
-        "port": str,
-        "locked_object": str,
-        "lock_mode": str,
-        "statement_start_time": str,
-        "lock_start_time": str
-    },
-    "get_leveldb_stats": {
-        "timestamp": str,
-        "server_ip": str,
-        "server_port": int,
-        "msg": str,
-        "count": int,
-        "average": float,
-        "max": float,
-        "max_timestamp": str,
-        "variance": float
-    }
-}
-m_escaping_character_metrics = {
-    "show_server_status": [list(data_sources["show_server_status"]).index('statement')],
-    "show_locks": [list(data_sources["show_locks"]).index('statement_string')]
-}
 
 
 class SqInit:
-    def __init__(self, args):
+    def __init__(self, args: argparse.Namespace):
         self.ip = args.sqream_ip
         self.port = args.sqream_port
         self.database = args.sqream_database
@@ -90,25 +47,18 @@ class SqInit:
 
             return conn
         except Exception as e:
-            log("ERROR", f"Unable to connect to Sqream: {str(e)}")
+            logging.error( f"Unable to connect to Sqream: {str(e)}")
         
-    def fetchall(self, cur, i_metric: str) -> List[Union[tuple, None]]:
+    def fetchall(self, cur, i_metric: str) -> List[Union[tuple, None]]: 
+        result = []
         try:
             cur.execute(f"select {i_metric}()")
             result = cur.fetchall()
-            if result and i_metric in m_escaping_character_metrics.keys():
-                for row_idx, row in enumerate(result):
-                    for col_idx, col in enumerate(row):
-                        if col_idx in m_escaping_character_metrics[i_metric]:
-                            # print("-- ESCAPE POSITION:",str(col_idx))
-                            tmp_lst = list(row)
-                            tmp_lst[col_idx] = row[col_idx].replace('\"', "\'").replace("\'", "\'\'")
-                            result[row_idx] = tuple(tmp_lst)
-            return result
         except Exception as e:
-            log("ERROR",f"Unable to fetch from Sqream: {str(e)}")
+            logging.error(f"Unable to fetch from Sqream: {str(e)}")
         finally:
             cur.close()
+            return result
 
 
 def set_logger():
@@ -118,6 +68,7 @@ def set_logger():
     datefmt='%Y-%m-%d %H:%M:%S'
 )
 
+#TODO: change to Logger.{status} remove it , change all i_variable names 
 
 def log(i_log_level: str, i_log_message: str):
     logger = logging.getLogger()
@@ -140,7 +91,7 @@ def log(i_log_level: str, i_log_message: str):
         logger.info(colored_message)
 
 
-def set_and_get_arguments():
+def set_and_get_arguments() -> argparse.Namespace:
     """
     Sqream connection parameters include:
     * IP/Hostname
@@ -161,7 +112,7 @@ def set_and_get_arguments():
     parser.add_argument('--sqream_database', type=str, help='Specify Sqream database', default='master')                    
     parser.add_argument('--sqream_user', type=str, help='Specify Sqream user', default='sqream')                     
     parser.add_argument('--sqream_password', type=str, help='Specify Sqream password', default='sqream')                     
-    parser.add_argument('--sqream_clustered', type=bool, help='Specify Sqream clustered', default=False)                        
+    parser.add_argument('--sqream_clustered', action='store_true' ,help='Specify Sqream clustered')                        
     parser.add_argument('--sqream_service', type=str, help='Specify Sqream service (Default: \'monitor\')', default='monitor')                        
     parser.add_argument('--remote_ip', type=str, help='Specify Loki remote ip address', default='127.0.0.1')
     parser.add_argument('--remote_port', type=int, help='Specify Loki remote port', default="3100")
@@ -174,16 +125,18 @@ def send_info_to_loki(sq_instance, loki_instance, metric_name: str, metric_execu
         sq_conn = sq_instance.connect()
         sq_cur = sq_conn.cursor()
         info_about_metric = sq_instance.fetchall(sq_cur, metric_name)
+
        
         while True:
-            log("INFO", f"{metric_name} - METRIC STARTED")
+            # logging.info(f"{metric_name} - METRIC STARTED - {len(info_about_metric)} ROWS FOUND")
+            log("INFO", f"{metric_name} - METRIC STARTED - {len(info_about_metric)} ROWS FOUND")
             for m_info in info_about_metric:
                 loki_instance.send_metric_table_to_loki(metric_name, monitor_metric.get_metric_tuple(m_info))
-            log("SUCCEED", f"{metric_name} - METRIC ENDED")   
+            log("SUCCEED", f"{metric_name} - METRIC ENDED - INSERTED SUCCSESFULLY")   
             time.sleep(metric_execution_time)
 
 
-def monitor_service_manager(args, config_monitor_file: dict):
+def monitor_service_manager(args: argparse.Namespace, config_monitor_file: dict):
     loki_url = f"http://{args.remote_ip}:{args.remote_port}/loki/api/v1/push"
     sq_instance = SqInit(args)
     loki_instance = LokiInit(loki_url)
@@ -199,11 +152,13 @@ def monitor_service_manager(args, config_monitor_file: dict):
 def main():
     set_logger()
     args = set_and_get_arguments()
+    # logging.info(f"{args}")
     log("INFO", f"{args}")
     config_monitor_file: dict = json.load(open(f"{os.getcwd()}/monitor_input.json"))
     monitor_service_manager(args, config_monitor_file)
 
 
 if __name__ == '__main__':
+    # logging.info('monitor service started')
     log("INFO", 'monitor service started')
     main()

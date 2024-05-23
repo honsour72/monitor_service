@@ -9,14 +9,14 @@ class LokiInit:
     def __init_subclass__(cls, **kwargs):
         cls.METRICS[cls.METRIC] = cls
 
-    def __init__(self, loki_url):
+    def __init__(self, loki_url: str):
         self.loki_url = loki_url
 
     def dict_to_log_line(self, data: dict):
         """Convert a dictionary to a formatted log line."""
         return json.dumps(data)
     
-    def create_log_entry(self, metric_lable: dict, log_line):
+    def create_log_entry(self, metric_lable: dict, log_line: dict) -> dict:
         """Create a log entry for Loki."""
         timestamp = int(time.time() * 1e9)  # Convert to nanoseconds
         return {
@@ -30,7 +30,7 @@ class LokiInit:
             ]
         }
     
-    def push_logs_to_loki(self, log_entry):
+    def push_logs_to_loki(self, log_entry: dict):
         """Push logs to Loki."""
         headers = {
             'Content-Type': 'application/json'
