@@ -4,16 +4,13 @@ import time
 import json
 import threading
 import argparse
-from typing import Literal, List, Union, Any
+from typing import List, Union
 import logging
 import pysqream
 import colorlog
 from loki_interface import LokiInit
 from pysqream.connection import Connection
 from pysqream.cursor import Cursor
-
-
-sq_conn = ""
 
 
 class SqInit:
