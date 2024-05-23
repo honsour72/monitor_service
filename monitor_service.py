@@ -121,7 +121,7 @@ def monitor_service_manager(args: argparse.Namespace, config_monitor_file: dict[
     loki_url = f"http://{args.remote_ip}:{args.remote_port}/loki/api/v1/push"  # noqa
     sq_instance = SqInit(args)
     loki_instance = LokiInit(loki_url)
-    unsupported_keys = [key for key in loki_instance.METRICS if key not in list(config_monitor_file.keys())]
+    unsupported_keys = [key for key in config_monitor_file.keys() if key not in loki_instance.METRICS]
     assert not unsupported_keys, f"Unsupported keys found: {unsupported_keys}"
     for metric_name, metric_execution_time in config_monitor_file.items():
         job_thread = threading.Thread(target=send_info_to_loki,
