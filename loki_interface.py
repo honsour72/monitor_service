@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import time
+from datetime import datetime
+
 import requests
 
 
@@ -20,15 +22,14 @@ class LokiInit:
         return json.dumps(data)
 
     @staticmethod
-    def create_log_entry(metric_label: dict, log_line: str) -> dict:
+    def create_log_entry(metric_labels: dict, log_line: str = None) -> dict:
         """Create a log entry for Loki."""
-        timestamp = int(time.time() * 1e9)  # Convert to nanoseconds
         return {
             'streams': [
                 {
-                    'stream': metric_label,
+                    'stream': metric_labels,
                     'values': [
-                        [str(timestamp), log_line]
+                        [str(int(time.time() * 1e9)), str(metric_labels)]
                     ]
                 }
             ]
@@ -36,17 +37,16 @@ class LokiInit:
     
     def push_logs_to_loki(self, log_entry: dict):
         """Push logs to Loki."""
-        headers = {
-            'Content-Type': 'application/json'
-        }
-        response = requests.post(self.loki_url, json=log_entry, headers=headers)
+        response = requests.post(self.loki_url, json=log_entry)
         response.raise_for_status()
 
     def send_metric_table_to_loki(self, metric_name: str, metric_info: dict):
-        metric_label = {'job': f"{metric_name}"}
-        log_line = self.dict_to_log_line(metric_info)
-        log_entry = self.create_log_entry(metric_label, log_line)
-        self.push_logs_to_loki(log_entry)
+        metric_labels = {"timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "job": f"{metric_name}"}
+        metric_labels.update(metric_info)
+        # log_line = self.dict_to_log_line(metric_info)
+        log_entry = self.create_log_entry(metric_labels)
+        response = requests.post(self.loki_url, json=log_entry)
+        response.raise_for_status()
 
 
 class ShowServerStatus(LokiInit):

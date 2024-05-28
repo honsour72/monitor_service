@@ -6,9 +6,9 @@
 ![Static Badge](https://img.shields.io/badge/pyarrow-16.1.0-red)
 ![Static Badge](https://img.shields.io/badge/pysqream-5.0.0-yellow)
 
-Python implementation of Sqreamdb monitor service.
+Python implementation of SQreamDB monitor service.
 
-## How to configure project
+## How to configure project environment
 
 Python version: 3.9
 
@@ -27,15 +27,81 @@ python3.9 -m venv .venv
 pip install -r requirements.txt
 ```
 
-## How to trigger Monitor service:
-1. Start monitor worker (no-GPU resource):
-  * cd <PACKAGE>
-  * bin/metadata_server
-  * bin/sqreamd <CLUSTER> 0 5000 ~/.sqream/license.enc -config <MONITOR_SERVICE_CLONE>/config_files/sqream_config.json &
+## How to trigger Monitor service
 
-2. Trigger Monitor Service:
-  * cd <MONITOR_SERVICE_CLONE>
-  * python3.9 monitor_service.py
+### 1. Sqream worker configuration examples
+
+`sqream_config.json`
+
+```json
+{
+    "cudaMemQuota":0,
+    "gpu": 0,
+    "legacyConfigFilePath": "sqream_config_legacy.json",
+    "metadataServerIp": "127.0.0.1",
+    "metadataServerPort": 3105,
+    "port": 5000,
+    "useConfigIP": true,
+    "limitQueryMemoryGB" : 8,
+    "initialSubscribedServices": "monitor"
+}
+```
+
+`sqream_config_legacy.json`
+
+```json
+{
+    "debugNetworkSession": false,
+    "developerMode": true,
+    "diskSpaceMinFreePercent": 1,
+    "enableLogDebug": true,
+    "insertCompressors": 8,
+    "insertParsers": 8,
+    "nodeInfoLoggingSec": 0,
+    "reextentUse": false,
+    "showFullExceptionInfo": true,
+    "showInternalExceptionInfo": false,
+    "useClientLog": true,
+    "useMetadataServer": true,
+    "spoolMemoryGB" : 4,
+    "clientReconnectionTimeout": 10000,
+    "liveConnectionThreshold": 100000
+}
+```
+
+### 2. Start monitor worker (no-GPU resource)
+
+1) Go to sqream package directory
+
+```commandline
+cd <sqream_package_dir>
+```
+
+2) Run metadata_server in background
+
+```commandline
+bin/metadata_server &
+```
+
+3) Run sqreamd worker in background
+
+```commandline
+bin/sqreamd -config <monitor_service_root_dir>/config_files/sqream_config.json &
+```
+
+### 3. Run Monitor Service
+
+1) Go to monitor service root directory
+
+```commandline
+cd <monitor_service_root_dir>
+```
+
+2) Run monitor service
+
+```commandline
+python monitor_service.py
+```
 
 
 ## Graph (for better understanding what's happening)
@@ -57,9 +123,6 @@ E --> F(pg_monitor)
 F --> E
 ```
 
+## Useful links:
 
-## Next steps
-
-1) Expansion: add utility functions scrapping `show_cluster_nodes`, `get_license_info`
-2) Store information in Prometheus instead of postgres
-3) Integrate monitor service with TI alike
+* [SQreamDB documentation](https://docs.sqream.com/en/latest/)
