@@ -53,30 +53,37 @@ def check_customer_metrics() -> None:
     log.success(f"All customer metrics {customer_metrics} are allowed")
 
 
-def get_allowed_metrics(metric_name: str | None = None
-                        ) -> list[str] | Any[ShowLocks, ShowClusterNodes, ShowServerStatus,
-                                             GetLicenseInfo, GetLevelDbStats]:
+def get_allowed_metrics(
+    metric_name: str | None = None,
+) -> (
+    list[str]
+    | ShowLocks
+    | ShowClusterNodes
+    | ShowServerStatus
+    | GetLicenseInfo
+    | GetLevelDbStats
+    | None
+):
     """
     Return `job` - sting attribute from every Metric dataclass in sqream_metrics.py if `metric_name` isn't specified
     Metric class instance - otherwise
     :param metric_name: string - name of metric, like `show_locks`, `get_leveldb_stats`, etc.
     :return: Metric class instance if `metric_name` is specified, list of all metrics based on `job` attribute otherwise
     """
-    # Take all sqream_metrics.py entities which are classes and have `job` attribute (only metrics dataclass has)
-    metric_classes = [metric_cls for metric_name, metric_cls in inspect.getmembers(sqream_metrics, inspect.isclass)
-                      if hasattr(metric_cls, "job")]
 
-    metric_names = [cls.job for cls in metric_classes]
+    # Take all sqream_metrics.py entities which are classes and have `job` attribute
+    # (only metrics dataclass has)
+    metric_names = []
+    for _, m_cls in inspect.getmembers(sqream_metrics, inspect.isclass):
+        if hasattr(m_cls, "job"):
+            if metric_name and metric_name == m_cls.job:
+                return m_cls
+            metric_names.append(m_cls.job)
 
     if metric_name is None:
         return metric_names
 
-    if metric_name not in metric_names:
-        raise NameError(f"Current metric `{metric_name}` wasn't found in allowed metrics: `{metric_names}`")
-
-    for cls in metric_classes:
-        if cls.job == metric_name:
-            return cls
+    raise NameError(f"Current metric `{metric_name}` wasn't found in allowed metrics: `{metric_names}`")
 
 
 def get_customer_metrics(metrics_json_path: str = None) -> dict[str, int]:
@@ -89,9 +96,18 @@ def get_customer_metrics(metrics_json_path: str = None) -> dict[str, int]:
 
 
 def check_sqream_connection(args: argparse.Namespace) -> None:
-    SqreamConnection(host=args.host, port=args.port, database=args.database, user=args.user,
-                     password=args.password, clustered=args.clustered, service=args.service)
-    log.success("Sqream connection established successfully")
+    try:
+        SqreamConnection(host=args.host, port=args.port, database=args.database, user=args.user,
+                         password=args.password, clustered=args.clustered, service=args.service)
+    except ConnectionRefusedError as connection_err:
+        # except and raise it here because native exception text (`Connection refused, perhaps wrong IP?`)
+        # isn't enough to understand the issue
+        raise ConnectionRefusedError(f"Can not establish connection to sqream database `{args.database}` on "
+                                     f"{args.host}:{args.port}. Credentials were: user=`{args.user}`, "
+                                     f"password=`{args.password}` (clustered = `{args.clustered}`) "
+                                     f"Service: {args.service}. Source exception is: {connection_err}")
+    else:
+        log.success("Sqream connection established successfully")
 
 
 def check_sqream_on_cpu(host: str, port: int) -> None:
@@ -108,7 +124,7 @@ def check_loki_connection(url: str) -> None:
     response = requests.get(url)
     msg = f"Request `curl -X GET {url}` returns `{response.text.strip()}` with status_code = {response.status_code}"
     if response.status_code != 200:
-        raise ValueError(msg)
+        raise ValueError(f"{msg}. Perhaps Loki's Ingester is not ready")
     log.success(f"Loki connection established successfully ({msg})")
 
 
