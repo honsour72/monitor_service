@@ -99,6 +99,8 @@ cd <monitor_service_root_dir>
 
 2) Configure `monitor_input.json` if you need
 
+Numbers here are timeouts for monitor metric processes to send `select <metric_name>();` query
+
 ```json
 {
   "show_server_status": 7,
@@ -112,11 +114,10 @@ cd <monitor_service_root_dir>
 3) Run monitor service
 
 ```commandline
-python monitor_service.py
+python main.py
 ```
 
-
-## Graph (for better understanding what's happening)
+## Graph (WILL BE REFACTORED LATER)
 
 ```mermaid
 graph LR

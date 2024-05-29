@@ -4,13 +4,13 @@ import argparse
 import inspect
 import json
 import os.path
-from typing import Any, Literal
+from typing import Any
 
 import requests
 from loguru import logger as log
 
 from infra import sqream_metrics
-from infra.sqream_metrics import ShowLocks, ShowClusterNodes
+from infra.sqream_metrics import ShowLocks, ShowClusterNodes, ShowServerStatus, GetLicenseInfo, GetLevelDbStats
 from infra.sqream_connection import SqreamConnection
 
 
@@ -43,16 +43,25 @@ def do_startup_checkups(args: argparse.Namespace) -> None:
 
 
 def check_customer_metrics() -> None:
+    """Check all metrics provided by customer in the `monitor_input.json` are known"""
     customer_metrics = get_customer_metrics()
     allowed_metrics = get_allowed_metrics()
     for customer_metric in customer_metrics:
         if customer_metric not in allowed_metrics:
-            raise NameError(f"Metric `{customer_metric}` from `monitor_input.json` isn't allowed."
+            raise NameError(f"Metric `{customer_metric}` from `monitor_input.json` isn't allowed. "
                             f"Allowed metrics: {allowed_metrics}")
     log.success(f"All customer metrics {customer_metrics} are allowed")
 
 
-def get_allowed_metrics(metric_name: str | None = None) -> list[str] | Any[ShowLocks, ShowClusterNodes]:
+def get_allowed_metrics(metric_name: str | None = None
+                        ) -> list[str] | Any[ShowLocks, ShowClusterNodes, ShowServerStatus,
+                                             GetLicenseInfo, GetLevelDbStats]:
+    """
+    Return `job` - sting attribute from every Metric dataclass in sqream_metrics.py if `metric_name` isn't specified
+    Metric class instance - otherwise
+    :param metric_name: string - name of metric, like `show_locks`, `get_leveldb_stats`, etc.
+    :return: Metric class instance if `metric_name` is specified, list of all metrics based on `job` attribute otherwise
+    """
     # Take all sqream_metrics.py entities which are classes and have `job` attribute (only metrics dataclass has)
     metric_classes = [metric_cls for metric_name, metric_cls in inspect.getmembers(sqream_metrics, inspect.isclass)
                       if hasattr(metric_cls, "job")]
@@ -79,13 +88,13 @@ def get_customer_metrics(metrics_json_path: str = None) -> dict[str, int]:
         return metrics
 
 
-def check_sqream_connection(args: argparse.Namespace):
+def check_sqream_connection(args: argparse.Namespace) -> None:
     SqreamConnection(host=args.host, port=args.port, database=args.database, user=args.user,
                      password=args.password, clustered=args.clustered, service=args.service)
     log.success("Sqream connection established successfully")
 
 
-def check_sqream_on_cpu(host: str, port: int):
+def check_sqream_on_cpu(host: str, port: int) -> None:
     try:
         SqreamConnection.execute("select 1")
     except Exception as InternalRuntimeError:
@@ -113,8 +122,5 @@ def safe(with_trace: bool = False) -> callable:
                     log.exception(handled_exception)
                 else:
                     log.error(handled_exception)
-            finally:
-                SqreamConnection.close()
-                log.info(f"Sqream connection closed successfully")
         return wrapper
     return decorator

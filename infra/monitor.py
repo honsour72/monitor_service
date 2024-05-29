@@ -90,8 +90,8 @@ def build_payload(metric_name: str, data: list[tuple[str | int]]) -> dict[str, l
     """
     https://grafana.com/docs/loki/latest/reference/loki-http-api/#examples
     :param metric_name:
-    :param data:
-    :return:
+    :param data: list with tuples of `select <metric_name>();` query result
+    :return: special dictionary for post request method
     """
     metric_cls = get_allowed_metrics(metric_name=metric_name)
 
