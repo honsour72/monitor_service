@@ -97,7 +97,19 @@ bin/sqreamd -config <monitor_service_root_dir>/config_files/sqream_config.json &
 cd <monitor_service_root_dir>
 ```
 
-2) Run monitor service
+2) Configure `monitor_input.json` if you need
+
+```json
+{
+  "show_server_status": 7,
+  "show_locks": 2,
+  "get_leveldb_stats": 5,
+  "show_cluster_nodes": 4,
+  "get_license_info": 5
+}
+```
+
+3) Run monitor service
 
 ```commandline
 python monitor_service.py
