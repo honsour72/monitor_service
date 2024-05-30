@@ -7,7 +7,7 @@ from pysqream.connection import Connection
 
 
 class SqreamConnection:
-    connection: Connection = None
+    connection: Connection | None = None
 
     def __new__(cls, host: str, port: int, database: str, user: str, password: str, clustered: bool, service: str):
         if cls.connection is None:
@@ -16,7 +16,7 @@ class SqreamConnection:
         return cls
 
     @staticmethod
-    def execute(query: str, fetch: Literal["one", "all"] = "all") -> list[tuple] | tuple[str | int]:
+    def execute(query: str, fetch: Literal["one", "all"] = "all") -> list[tuple] | tuple[str | int] | None:
         """
 
         :param query:
@@ -44,5 +44,5 @@ class SqreamConnection:
 
     @staticmethod
     def close():
-        if not SqreamConnection.connection.con_closed:
+        if SqreamConnection.connection is not None and not SqreamConnection.connection.con_closed:
             SqreamConnection.connection.close_connection()

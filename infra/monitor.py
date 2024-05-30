@@ -45,9 +45,11 @@ def terminate_metric_processes(*_, processes: list[Process] | None = None) -> No
     :param processes: list of `multiprocessing.Process` instances
     :return: None
     """
-    log.info(f"Killing all ({len(processes)}) processes")
-    for process in processes:
-        process.terminate()
+    if processes is not None:
+        log.info(f"Killing all ({len(processes)}) processes")
+        for process in processes:
+            process.terminate()
+    return None
 
 
 def schedule_process_for_metric(metric_name: str, metric_timeout: int, url: str, processes: list[Process]) -> None:
@@ -60,18 +62,23 @@ def schedule_process_for_metric(metric_name: str, metric_timeout: int, url: str,
     :return: None
     """
     log.debug(f"[{metric_name}]: Start process with timeout = {metric_timeout} sec")
-    while True:
-        try:
+    try:
+        while True:
             # get data from sqream
             rows = SqreamConnection.execute(f"select {metric_name}()")
+            if rows is None:
+                raise ValueError(f"Sqream `select {metric_name}();` query returned `None` type (`{rows}`)")
             # send data to loki
             push_logs_to_loki(url=url, metric_name=metric_name, rows=rows)
             # sleep `metric_timeout` seconds
             sleep(metric_timeout)
-        except (KeyboardInterrupt, Exception) as unhandled_exception:
-            log.info(f"[{metric_name}]: process interrupted with: {unhandled_exception}")
-            terminate_metric_processes(signal.SIGINT, None, processes)
-            return
+    except Exception as unhandled_exception:
+        log.exception(unhandled_exception)
+    except KeyboardInterrupt:
+        log.info(f"[{metric_name}]: process interrupted by user")
+    finally:
+        terminate_metric_processes(signal.SIGINT, None, processes)
+        return
 
 
 def push_logs_to_loki(url: str, metric_name: str, rows: list[tuple[str | int]]) -> None:
@@ -94,6 +101,9 @@ def build_payload(metric_name: str, data: list[tuple[str | int]]) -> dict[str, l
     :return: special dictionary for post request method
     """
     metric_cls = get_allowed_metrics(metric_name=metric_name)
+    if isinstance(metric_cls, list):
+        raise TypeError(f"[{metric_name}]: function `get_allowed_metrics` returned `{metric_cls}` "
+                        f"instead of class instance")
 
     values = []
     labels = {"service_name": "monitor", "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}

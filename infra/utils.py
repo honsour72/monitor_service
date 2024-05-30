@@ -4,7 +4,7 @@ import argparse
 import inspect
 import json
 import os.path
-from typing import Any
+from typing import Any, Callable
 
 import requests
 from loguru import logger as log
@@ -46,6 +46,9 @@ def check_customer_metrics() -> None:
     """Check all metrics provided by customer in the `monitor_input.json` are known"""
     customer_metrics = get_customer_metrics()
     allowed_metrics = get_allowed_metrics()
+    if not isinstance(allowed_metrics, list):
+        raise TypeError(f"`get_allowed_metrics` have to return list of strings,"
+                        f"but actually returned: `{allowed_metrics}`")
     for customer_metric in customer_metrics:
         if customer_metric not in allowed_metrics:
             raise NameError(f"Metric `{customer_metric}` from `monitor_input.json` isn't allowed. "
@@ -57,12 +60,11 @@ def get_allowed_metrics(
     metric_name: str | None = None,
 ) -> (
     list[str]
-    | ShowLocks
-    | ShowClusterNodes
-    | ShowServerStatus
-    | GetLicenseInfo
-    | GetLevelDbStats
-    | None
+    | type[ShowLocks]
+    | type[ShowClusterNodes]
+    | type[ShowServerStatus]
+    | type[GetLicenseInfo]
+    | type[GetLevelDbStats]
 ):
     """
     Return `job` - sting attribute from every Metric dataclass in sqream_metrics.py if `metric_name` isn't specified
@@ -86,7 +88,7 @@ def get_allowed_metrics(
     raise NameError(f"Current metric `{metric_name}` wasn't found in allowed metrics: `{metric_names}`")
 
 
-def get_customer_metrics(metrics_json_path: str = None) -> dict[str, int]:
+def get_customer_metrics(metrics_json_path: str | None = None) -> dict[str, int]:
     if metrics_json_path is None:
         metrics_json_path = os.path.join(os.getcwd(), "monitor_input.json")
 
@@ -124,12 +126,12 @@ def check_loki_connection(url: str) -> None:
     response = requests.get(url)
     msg = f"Request `curl -X GET {url}` returns `{response.text.strip()}` with status_code = {response.status_code}"
     if response.status_code != 200:
-        raise ValueError(f"{msg}. Perhaps Loki's Ingester is not ready")
+        raise ValueError(f"{msg}. Perhaps Loki's Ingester is not ready, wait 15 seconds and run")
     log.success(f"Loki connection established successfully ({msg})")
 
 
-def safe(with_trace: bool = False) -> callable:
-    def decorator(func: callable) -> callable:
+def safe(with_trace: bool = False) -> Callable[[Callable[[], Any]], Callable[[], Any]]:
+    def decorator(func: Callable) -> Callable[[], Any]:
         def wrapper(*args, **kwargs) -> Any:
             try:
                 return func(*args, **kwargs)
