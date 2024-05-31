@@ -6,6 +6,7 @@ import signal
 from time import sleep, time
 from datetime import datetime
 from multiprocessing import Process, Event
+from typing import Any
 
 import requests
 from loguru import logger as log
@@ -26,22 +27,25 @@ def run_monitor(args: argparse.Namespace) -> None:
     log.info(f"Starting {len(metrics)} process for metrics: {', '.join(metrics.keys())}")
     # List of processes to kill other if something will happen to anyone
     processes = []
-    killall_process_event = Event()
+    # multiprocessing Event to stop process's `while True` loop: if event.set() while loop will be broken
+    process_crushed = Event()
     # Run process for every metric
-    for i, metric_name in enumerate(metrics):
+    for metric_name, metric_timeout in metrics.items():
         p = Process(target=schedule_process_for_metric,
-                    args=(metric_name, metrics[metric_name], loki_url, killall_process_event),
+                    args=(metric_name, metric_timeout, loki_url, process_crushed),
                     name=metric_name)
         p.start()
         processes.append(p)
 
+    # set `terminate_metric_processes` as a function which will be triggered after ctrl+c pressed
     signal.signal(signal.SIGINT, lambda s, f: terminate_metric_processes(
-        s, f, processes=processes, stop_event=killall_process_event))
+        s, f, processes=processes, stop_event=process_crushed))
 
-    while not killall_process_event.is_set():
+    # monitor event with loop below
+    while not process_crushed.is_set():
         # monitor every process every second
         sleep(1)
-
+    # if `process_crushed` event was set - terminate all other processes
     terminate_metric_processes(signal.SIGTERM, processes=processes)
 
 
@@ -49,7 +53,7 @@ def terminate_metric_processes(*_, processes: list[Process] | None = None, stop_
     """
     Handler for killing multiprocessing processes if program was interrupted (ctrl+c pressed)
     or in case of unhandled exception
-    :param stop_event:
+    :param stop_event: multiprocessing.Event class for set it to prevent other processes work
     :param _: signal and frame - mandatory for `signal.signal` - removed here, because we just need to kill everything
     :param processes: list of `multiprocessing.Process` instances
     :return: None
@@ -67,9 +71,9 @@ def terminate_metric_processes(*_, processes: list[Process] | None = None, stop_
 def schedule_process_for_metric(metric_name: str, metric_timeout: int, url: str, stop_event: Event) -> None:
     """
     Main process function to receive metric data from sqream and push it to Loki instance
-    :param stop_event:
+    :param stop_event: multiprocessing.Event instance to keep Process working or abort it
     :param metric_name: string, metric name from `monitor_input.json`
-    :param metric_timeout: int, timeout to wait after every `select <metric_name>();` query
+    :param metric_timeout: float, timeout to wait after every `select <metric_name>();` query
     :param url: loki specific endpoint to push logs
     :return: None
     """
@@ -98,6 +102,26 @@ def schedule_process_for_metric(metric_name: str, metric_timeout: int, url: str,
 
 
 def push_logs_to_loki(url: str, metric_name: str, data: list[dict[str, str | int]] | dict[str, str | int]) -> None:
+    """
+    Function to send post http request to loki
+
+    :param url: loki endpoint to push logs (http://host:port/loki/api/v1/push)
+    :param metric_name: string, metric name from `monitor_input.json`
+    :param data: list of dicts or dict with row(s) data within
+
+    Examples:
+    1) For one row it will be one dict:
+    { "server_ip": "127.0.0.1", "server_port": 5000, ... "statement_id": "node_6999" }
+    2) For many rows it will be a list with dicts inside:
+    [
+        { "write_limit": "123", "read_limit": "321", ... "license_info": "some text" },
+        ...
+        { "write_limit": "456", "read_limit": "654", ... "license_info": "other text" },
+    ]
+    3) Sometimes data maybe empty list `[]`
+
+    :return: Nothing, just send post http request
+    """
     if len(data) == 0:
         log.warning(f"[{metric_name}]: sqream query `select {metric_name}();` returned 0 rows. Skip sending it to Loki")
         return None
@@ -112,14 +136,23 @@ def push_logs_to_loki(url: str, metric_name: str, data: list[dict[str, str | int
         raise requests.HTTPError(message)
 
 
-def build_payload(metric_name: str, data: list[dict[str, str | int]] | dict[str, str | int]) -> dict[str, list[dict]]:
+def build_payload(metric_name: str,
+                  data: list[dict[str, str | int]] | dict[str, str | int]
+                  ) -> dict[str, list[dict[str, Any]]]:
     """
+    Examples of curl post request for pushing logs to loki:
     https://grafana.com/docs/loki/latest/reference/loki-http-api/#examples
-    :param metric_name:
-    :param data: list with tuples of `select <metric_name>();` query result
-    :return: special dictionary for post request method
+
+    Minimal example below:
+
+    curl -H "Content-Type: application/json" -s -X POST "http://localhost:3100/loki/api/v1/push" \
+        --data-raw '{"streams": [{ "stream": { "foo": "bar2" }, "values": [ [ "1570818238000000000", "fizzbuzz" ] ] }]}'
+
+    :param metric_name: name of utility function used for `job` field in Loki
+    :param data: list of dicts or dict with rows data within (see `push_logs_to_loki` for examples)
+    :return: special dictionary (data-raw in example above) for post request body
     """
-    labels = {"timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "job": metric_name}
+    labels: dict[str, Any] = {"timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "job": metric_name}
 
     if isinstance(data, dict):
         labels.update(data)

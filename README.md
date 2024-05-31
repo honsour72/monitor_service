@@ -29,10 +29,16 @@ Python version: 3.9
     ```commandline
     pip install -r requirements.txt
     ```
+   
+4. Run tests
+   
+   ```commandline
+   pytest -v
+   ```
 
 ## How to trigger Monitor service
 
-### 1. Sqream worker configuration examples
+### 1. Start monitor worker (no-GPU resource)
 
 `sqream_config.json`
 
@@ -72,8 +78,6 @@ Python version: 3.9
 }
 ```
 
-### 2. Start monitor worker (no-GPU resource)
-
 1) Go to sqream package directory
 
     ```commandline
@@ -92,7 +96,7 @@ Python version: 3.9
     bin/sqreamd -config <monitor_service_root_dir>/config_files/sqream_config.json &
     ```
 
-### 3. Run Monitor Service
+### 2. Run Monitor Service
 
 1) Go to monitor service root directory
 
