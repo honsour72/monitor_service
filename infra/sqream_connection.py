@@ -16,23 +16,20 @@ class SqreamConnection:
         return cls
 
     @staticmethod
-    def execute(query: str, fetch: Literal["one", "all"] = "all") -> list[tuple] | tuple[str | int] | None:
+    def execute(query: str, fetch: Literal["one", "all"] = "all") -> list[dict[str, int | str]] | dict[str | int | str]:
         """
-
         :param query:
         :param fetch:
         :return: list of tuples (many rows) - for fetchall, tuple with data (one row) - for fetchone
 
-        Examples:
-        For `select show_cluster_nodes()` query results will be:
-        1) fetchall:
-        [ ('127.0.0.1', 5000, 9,  'node_2777', 2, 'available'),
-          ('127.0.0.1', 5000, 10, 'node_3888', 3, 'pending'),
-          ('127.0.0.1', 5000, 11, 'node_4999', 4, 'busy')
-        ]
+        NOTE:
+        For some strange reasons Loki can not receive http post request body data with spaces. For example, this data
+        {"key name": "key value"}
+        will not be handled (Response is 400: Bad request) - and this:
+        {"key_name": "key_value"}
+        will be handled
 
-        2) fetchone:
-        ('127.0.0.1', 5000, 9, 'node_2777', 2, 'available')
+        For this reason I use `replace(" ", "_")` to change spaces on underscore sign before result
         """
         with SqreamConnection.connection.cursor() as cursor:
             cursor.execute(query)
@@ -40,7 +37,14 @@ class SqreamConnection:
                 result = cursor.fetchone()
             else:
                 result = cursor.fetchall()
-        return result
+
+        if result is None:
+            return []
+
+        if fetch == "one":
+            return {col_name.replace(" ", "_"): value for col_name, value in zip(cursor.col_names, result)}
+
+        return [{col_name.replace(" ", "_"): value for col_name, value in zip(cursor.col_names, row)} for row in result]
 
     @staticmethod
     def close():

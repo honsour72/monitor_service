@@ -1,17 +1,24 @@
 from __future__ import annotations
 
 import argparse
-import inspect
 import json
 import os.path
+from functools import wraps
 from typing import Any, Callable
 
 import requests
 from loguru import logger as log
 
-from infra import sqream_metrics
-from infra.sqream_metrics import ShowLocks, ShowClusterNodes, ShowServerStatus, GetLicenseInfo, GetLevelDbStats
 from infra.sqream_connection import SqreamConnection
+
+
+_ALLOWED_METRICS = (
+    "show_server_status",
+    "show_locks",
+    "get_leveldb_stats",
+    "show_cluster_nodes",
+    "get_license_info"
+)
 
 
 def get_command_line_arguments() -> argparse.Namespace:
@@ -26,8 +33,15 @@ def get_command_line_arguments() -> argparse.Namespace:
                         default='monitor')
     parser.add_argument('--loki_host', type=str, help='Loki remote address', default='127.0.0.1')
     parser.add_argument('--loki_port', type=int, help='Loki remote port', default="3100")
+    parser.add_argument('--log_file_path', type=str, help='Name of file to store logs', default=None)
 
     return parser.parse_args()
+
+
+def add_log_sink(log_file_path: str | None = None) -> None:
+    if log_file_path is not None:
+        log.info(f"Logs also will be provided to {log_file_path}")
+        log.add(log_file_path)
 
 
 def do_startup_checkups(args: argparse.Namespace) -> None:
@@ -39,53 +53,22 @@ def do_startup_checkups(args: argparse.Namespace) -> None:
     # 3. Check sqream is working on CPU and not on GPU
     check_sqream_on_cpu(host=args.host, port=args.port)
     # 4. Check Loki's connection is established
-    check_loki_connection(url=f"http://{args.loki_host}:{args.loki_port}/ready")
+    check_loki_connection(url=f"http://{args.loki_host}:{args.loki_port}/metrics")
 
 
 def check_customer_metrics() -> None:
     """Check all metrics provided by customer in the `monitor_input.json` are known"""
     customer_metrics = get_customer_metrics()
-    allowed_metrics = get_allowed_metrics()
-    if not isinstance(allowed_metrics, list):
-        raise TypeError(f"`get_allowed_metrics` have to return list of strings,"
-                        f"but actually returned: `{allowed_metrics}`")
     for customer_metric in customer_metrics:
-        if customer_metric not in allowed_metrics:
+        if customer_metric not in _ALLOWED_METRICS:
             raise NameError(f"Metric `{customer_metric}` from `monitor_input.json` isn't allowed. "
-                            f"Allowed metrics: {allowed_metrics}")
-    log.success(f"All customer metrics {customer_metrics} are allowed")
-
-
-def get_allowed_metrics(
-    metric_name: str | None = None,
-) -> (
-    list[str]
-    | type[ShowLocks]
-    | type[ShowClusterNodes]
-    | type[ShowServerStatus]
-    | type[GetLicenseInfo]
-    | type[GetLevelDbStats]
-):
-    """
-    Return `job` - sting attribute from every Metric dataclass in sqream_metrics.py if `metric_name` isn't specified
-    Metric class instance - otherwise
-    :param metric_name: string - name of metric, like `show_locks`, `get_leveldb_stats`, etc.
-    :return: Metric class instance if `metric_name` is specified, list of all metrics based on `job` attribute otherwise
-    """
-
-    # Take all sqream_metrics.py entities which are classes and have `job` attribute
-    # (only metrics dataclass has)
-    metric_names = []
-    for _, m_cls in inspect.getmembers(sqream_metrics, inspect.isclass):
-        if hasattr(m_cls, "job"):
-            if metric_name and metric_name == m_cls.job:
-                return m_cls
-            metric_names.append(m_cls.job)
-
-    if metric_name is None:
-        return metric_names
-
-    raise NameError(f"Current metric `{metric_name}` wasn't found in allowed metrics: `{metric_names}`")
+                            f"Allowed metrics: {_ALLOWED_METRICS}")
+        metric_timeout = customer_metrics[customer_metric]
+        try:
+            float(metric_timeout)
+        except ValueError:
+            raise ValueError(f"Can not convert metric `{customer_metric}` value `{metric_timeout}` to `float` type")
+    log.success(f"All customer metrics {customer_metrics} are validated and allowed")
 
 
 def get_customer_metrics(metrics_json_path: str | None = None) -> dict[str, int]:
@@ -124,14 +107,16 @@ def check_sqream_on_cpu(host: str, port: int) -> None:
 
 def check_loki_connection(url: str) -> None:
     response = requests.get(url)
-    msg = f"Request `curl -X GET {url}` returns `{response.text.strip()}` with status_code = {response.status_code}"
+    msg = f"Request `curl -X GET {url}` returns status_code = {response.status_code}"
     if response.status_code != 200:
-        raise ValueError(f"{msg}. Perhaps Loki's Ingester is not ready, wait 15 seconds and run")
+        raise ValueError(msg)
     log.success(f"Loki connection established successfully ({msg})")
 
 
 def safe(with_trace: bool = False) -> Callable[[Callable[[], Any]], Callable[[], Any]]:
     def decorator(func: Callable) -> Callable[[], Any]:
+
+        @wraps(func)
         def wrapper(*args, **kwargs) -> Any:
             try:
                 return func(*args, **kwargs)
