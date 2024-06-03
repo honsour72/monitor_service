@@ -93,7 +93,7 @@ def check_customer_metrics() -> None:
             float(metric_timeout)
         except ValueError:
             raise ValueError(f"Can not convert metric `{customer_metric}` value `{metric_timeout}` to `float` type")
-    log.success(f"All customer metrics {customer_metrics} are validated and allowed")
+    log.success(f"All metrics are validated and allowed")
 
 
 def get_customer_metrics(metrics_json_path: str | None = None) -> dict[str, int]:
@@ -130,9 +130,8 @@ def check_sqream_on_cpu(host: str, port: int) -> None:
     """
     try:
         SqreamConnection.execute("select 1")
-    except Exception as InternalRuntimeError:
-        log.success(f"Query `select 1` raises `Internal Runtime Error` which means sqream is running on CPU. "
-                    f"(Exception: `{InternalRuntimeError!r}`)")
+    except Exception:
+        log.success(f"Query `select 1` raises `Internal Runtime Error` which means sqream is running on CPU.")
     else:
         raise TypeError(f"sqreamd on `{host}:{port}` works on GPU instead of CPU")
 
@@ -142,7 +141,7 @@ def check_loki_connection(url: str) -> None:
     msg = f"Request `curl -X GET {url}` returns status_code = {response.status_code}"
     if response.status_code != 200:
         raise ValueError(msg)
-    log.success(f"Loki connection established successfully ({msg})")
+    log.success(f"Loki connection established successfully.")
 
 
 def safe(with_trace: bool = False) -> Callable[[Callable[[], Any]], Callable[[], Any]]:

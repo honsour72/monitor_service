@@ -24,7 +24,7 @@ def run_monitor(args: argparse.Namespace) -> None:
     loki_url = f"http://{args.loki_host}:{args.loki_port}/loki/api/v1/push"
     # collect customer metrics from `monitor_input.json`
     metrics = get_customer_metrics()
-    log.info(f"Starting {len(metrics)} process for metrics: {', '.join(metrics.keys())}")
+    log.info(f"Starting {len(metrics)} processes for metrics: {', '.join(metrics.keys())}")
     # List of processes to kill other if something will happen to anyone
     processes = []
     # multiprocessing Event to stop process's `while True` loop: if event.set() while loop will be broken
@@ -77,13 +77,18 @@ def schedule_process_for_metric(metric_name: str, metric_timeout: int, url: str,
     :param url: loki specific endpoint to push logs
     :return: None
     """
-    log.debug(f"[{metric_name}]: Start process with timeout = {metric_timeout} sec")
+    log.debug(f"[{metric_name}]: process with timeout = {metric_timeout} sec started successfully")
     try:
         while not stop_event.is_set():
             # get data from sqream
             data = SqreamConnection.execute(f"select {metric_name}()")
-            # send data to loki
-            push_logs_to_loki(url=url, metric_name=metric_name, data=data)
+            if len(data) == 0:
+                log.warning(
+                    f"[{metric_name}]: sqream query `select {metric_name}();` returned 0 rows. Skip sending it to Loki")
+            else:
+                log.success(f"[{metric_name}]: `select {metric_name}();` -> {len(data)} rows")
+                # send data to loki
+                push_logs_to_loki(url=url, metric_name=metric_name, data=data)
             # sleep `metric_timeout` seconds
             sleep(metric_timeout)
     except KeyboardInterrupt:
@@ -122,18 +127,15 @@ def push_logs_to_loki(url: str, metric_name: str, data: list[dict[str, str | int
 
     :return: Nothing, just send post http request
     """
-    if len(data) == 0:
-        log.warning(f"[{metric_name}]: sqream query `select {metric_name}();` returned 0 rows. Skip sending it to Loki")
-        return None
-    log.info(f"[{metric_name}]: Get {len(data)} rows from sqream after `select {metric_name}();` query")
+
     payload = build_payload(metric_name=metric_name, data=data)
     answer = requests.post(url, json=payload)
-    message = (f"[{metric_name}]: {answer}. Request was: "
-               f"`curl -X POST -H 'Content-Type: application/json' --data-raw '{json.dumps(payload)}' {url}`")
     if answer.status_code == 204:
-        log.info(message)
+        log.success(f"[{metric_name}]: successfully sent data ({len(data)} rows) to loki")
     else:
-        raise requests.HTTPError(message)
+        raise requests.HTTPError(f"[{metric_name}]: {answer}. Request was: "
+                                 f"`curl -X POST -H 'Content-Type: application/json' --data-raw "
+                                 f"'{json.dumps(payload)}' {url}`")
 
 
 def build_payload(metric_name: str,
