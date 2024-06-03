@@ -129,7 +129,7 @@ def push_logs_to_loki(url: str, metric_name: str, data: list[dict[str, str | int
     """
 
     payload = build_payload(metric_name=metric_name, data=data)
-    answer = requests.post(url, json=payload)
+    answer = requests.post(url, json=payload, allow_redirects=False, verify=True)
     if answer.status_code == 204:
         log.success(f"[{metric_name}]: successfully sent data ({len(data)} rows) to loki")
     else:

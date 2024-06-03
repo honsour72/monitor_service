@@ -1,4 +1,4 @@
-# sqreamdb-monitor-service
+# SqreamDB Monitor Service
 
 ![Static Badge](https://img.shields.io/badge/colorama-0.4.6-darkblue)
 ![Static Badge](https://img.shields.io/badge/numpy-1.26.4-blue)
@@ -8,9 +8,13 @@
 
 Python implementation of SQreamDB monitor service.
 
-## How to configure project environment
-
 Python version: 3.9
+
+Also, you need to be installed:
+* [Grafana](https://roman-academy.medium.com/how-to-install-and-configure-grafana-on-centos-7-56c28dc04840)
+* [Loki](https://grafana.com/docs/loki/latest/setup/install/)
+
+## How to configure project environment
 
 1. Create virtual environment
 
@@ -131,6 +135,7 @@ Python version: 3.9
 > If argument is an `option` you just need to put its name, and it will be True otherwise False\
 > For example if you put `option` `-h` or `--help` it will be recognized as `True` if you don't do it - `False`
 
+
 | #  | view              | type    | description                        | default     |
 |----|-------------------|---------|------------------------------------|-------------|
 | 1  | `-h` `--help`     | option  | show help message                  | `-`         |
@@ -168,7 +173,6 @@ D2 --> E(while True:)
 D3 --> E(while True:)
 D4 --> E(while True:)
 E --> |send query to sqream| F(fetch select `metric_name`)
-M(metrics dataclasses) --> |use metric name to get dict| G(create loki labels)
 F --> G(push logs to loki)
 G --> |POST REQUEST| H(sleep timeout)
 H --> E
@@ -177,3 +181,5 @@ H --> E
 ## Useful links
 
 * [SQreamDB documentation](https://docs.sqream.com/en/latest/)
+* [Grafana installation guide](https://roman-academy.medium.com/how-to-install-and-configure-grafana-on-centos-7-56c28dc04840)
+* [Loki installation guide](https://grafana.com/docs/loki/latest/setup/install/)
