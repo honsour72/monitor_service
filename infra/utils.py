@@ -11,7 +11,6 @@ from loguru import logger as log
 
 from infra.sqream_connection import SqreamConnection
 
-
 _ALLOWED_METRICS = (
     "show_server_status",
     "show_locks",
@@ -22,9 +21,8 @@ _ALLOWED_METRICS = (
 
 
 def get_command_line_arguments() -> argparse.Namespace:
-    """
-    usage: main.py [-h --help] [--host] [--port] [--database] [--user] [--password] [--clustered] [--service]
-                   [--loki_host] [--loki_port] [--log_file_path]
+    """usage: main.py [-h --help] [--host] [--port] [--database] [--user] [--password] [--clustered] [--service]
+                      [--loki_host] [--loki_port] [--log_file_path]
 
     Command-line interface for monitor-service project
 
@@ -43,25 +41,24 @@ def get_command_line_arguments() -> argparse.Namespace:
 
     :return: argparse.Namespace with parsed arguments
     """
-    parser = argparse.ArgumentParser(description='Command-line interface for monitor-service project')
-    parser.add_argument('--host', type=str, help='Sqream ip address', default='localhost')
-    parser.add_argument('--port', type=int, help='Specify Sqream port', default=5000)
-    parser.add_argument('--database', type=str, help='Specify Sqream database', default='master')
-    parser.add_argument('--user', type=str, help='Specify Sqream user', default='sqream')
-    parser.add_argument('--password', type=str, help='Specify Sqream password', default='sqream')
-    parser.add_argument('--clustered', action='store_true', help='Specify Sqream clustered')
-    parser.add_argument('--service', type=str, help="Sqream service (default: `monitor`)",
-                        default='monitor')
-    parser.add_argument('--loki_host', type=str, help='Loki remote address', default='127.0.0.1')
-    parser.add_argument('--loki_port', type=int, help='Loki remote port', default="3100")
-    parser.add_argument('--log_file_path', type=str, help='Name of file to store logs', default=None)
+    parser = argparse.ArgumentParser(description="Command-line interface for monitor-service project")
+    parser.add_argument("--host", type=str, help="Sqream ip address", default="localhost")
+    parser.add_argument("--port", type=int, help="Specify Sqream port", default=5000)
+    parser.add_argument("--database", type=str, help="Specify Sqream database", default="master")
+    parser.add_argument("--user", type=str, help="Specify Sqream user", default="sqream")
+    parser.add_argument("--password", type=str, help="Specify Sqream password", default="sqream")
+    parser.add_argument("--clustered", action="store_true", help="Specify Sqream clustered")
+    parser.add_argument("--service", type=str, help="Sqream service (default: `monitor`)",
+                        default="monitor")
+    parser.add_argument("--loki_host", type=str, help="Loki remote address", default="127.0.0.1")
+    parser.add_argument("--loki_port", type=int, help="Loki remote port", default="3100")
+    parser.add_argument("--log_file_path", type=str, help="Name of file to store logs", default=None)
 
     return parser.parse_args()
 
 
 def add_log_sink(log_file_path: str | None = None) -> None:
-    """
-    Add loguru sink for store log lines if `log_file_path` was specified. More documentation here:
+    """Add loguru sink for store log lines if `log_file_path` was specified. More documentation here:
     https://loguru.readthedocs.io/en/stable/api/logger.html#loguru._logger.Logger.add
     :param log_file_path: string - path for logs file
     :return: None
@@ -124,8 +121,7 @@ def check_sqream_connection(args: argparse.Namespace) -> None:
 
 
 def check_sqream_on_cpu(host: str, port: int) -> None:
-    """
-    Ticket: https://sqream.atlassian.net/browse/SQ-17718
+    """Ticket: https://sqream.atlassian.net/browse/SQ-17718
 
     We need to make sure that worker runs on CPU to avoid data affection
     :param host: sqreamd (server picker) address to establish connection
@@ -136,7 +132,7 @@ def check_sqream_on_cpu(host: str, port: int) -> None:
         SqreamConnection.execute("select 1")
     except Exception as InternalRuntimeError:
         log.success(f"Query `select 1` raises `Internal Runtime Error` which means sqream is running on CPU. "
-                    f"(Exception: `{repr(InternalRuntimeError)}`)")
+                    f"(Exception: `{InternalRuntimeError!r}`)")
     else:
         raise TypeError(f"sqreamd on `{host}:{port}` works on GPU instead of CPU")
 

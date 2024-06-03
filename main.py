@@ -1,14 +1,20 @@
-from infra.utils import get_command_line_arguments, safe, do_startup_checkups, add_log_sink
+"""Main monitor service module."""
 from infra.monitor import run_monitor
+from infra.utils import (
+    add_log_sink,
+    do_startup_checkups,
+    get_command_line_arguments,
+    safe,
+)
 
 
 @safe()
 def main() -> None:
-    """
-    Main function to run monitor service
+    """Run monitor service.
 
-    Put `with_trace=True` into `safe` decorator like `safe(with_trace=True)` to see all tracebacks for debugging
-    You can find all allowed metrics (sqreamd utility functions) in ./infra/utils.py
+    Put `with_trace=True` into `safe` decorator like `safe(with_trace=True)`
+    to see all tracebacks for debugging. You can find all allowed metrics
+    (sqreamd utility functions) in ./infra/utils.py
 
     Steps below:
     1) Read arguments from command-line
@@ -16,7 +22,8 @@ def main() -> None:
     3) Do checkups (are metrics allowed, is connection established)
     4) Run monitor service is everything is ok, raise an exception otherwise
 
-    usage: main.py [-h --help] [--host] [--port] [--database] [--user] [--password] [--clustered] [--service]
+    usage: main.py [-h --help] [--host] [--port] [--database]
+                   [--user] [--password] [--clustered] [--service]
                    [--loki_host] [--loki_port] [--log_file_path]
 
     Command-line interface for monitor-service project
