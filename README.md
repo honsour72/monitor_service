@@ -173,12 +173,9 @@ D2 --> E(while True:)
 D3 --> E(while True:)
 D4 --> E(while True:)
 E --> |send query to sqream| F(fetch data from `select metric_name`)
-F --> |data is empty| S(skip sending to loki)
-F --> |data - list of dicts| L(for row in data)
-L --> |POST REQUEST| G
+F --> |data is empty| S(do not send to loki)
 G --> H(sleep timeout)
-F --> |data - dict| G(push logs to loki)
-G --> L
+F --> |data - dict| G(send logs to loki)
 S --> H
 H --> E
 ```

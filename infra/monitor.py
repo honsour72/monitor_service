@@ -131,7 +131,7 @@ def push_logs_to_loki(url: str, metric_name: str, data: list[dict[str, str | int
     payload = build_payload(metric_name=metric_name, data=data)
     answer = requests.post(url, json=payload, allow_redirects=False, verify=True)
     if answer.status_code == 204:
-        log.success(f"[{metric_name}]: Loki successfully accepts data (row number: {row_number})")
+        log.success(f"[{metric_name}]: Loki successfully accepts {len(data)} rows")
     else:
         raise requests.HTTPError(f"[{metric_name}]: {answer}. Request was: "
                                  f"`curl -X POST -H 'Content-Type: application/json' --data-raw "
