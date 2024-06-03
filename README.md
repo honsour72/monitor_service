@@ -13,23 +13,32 @@ Python implementation of SQreamDB monitor service.
 Python version: 3.9
 
 1. Create virtual environment
-```commandline
-python3.9 -m venv .venv
-```
+
+    ```commandline
+    python3.9 -m venv .venv
+    ```
 
 2. Activate virtual environment
-```commandline
-. .venv/bin/activate
-```
 
-3. Install requirements 
-```commandline
-pip install -r requirements.txt
-```
+    ```commandline
+    . .venv/bin/activate
+    ```
+
+3. Install requirements
+
+    ```commandline
+    pip install -r requirements.txt
+    ```
+   
+4. Run tests
+   
+   ```commandline
+   pytest -v
+   ```
 
 ## How to trigger Monitor service
 
-### 1. Sqream worker configuration examples
+### 1. Start monitor worker (no-GPU resource)
 
 `sqream_config.json`
 
@@ -69,60 +78,80 @@ pip install -r requirements.txt
 }
 ```
 
-### 2. Start monitor worker (no-GPU resource)
-
 1) Go to sqream package directory
 
-```commandline
-cd <sqream_package_dir>
-```
+    ```commandline
+    cd <sqream_package_dir>
+    ```
 
 2) Run metadata_server in background
 
-```commandline
-bin/metadata_server &
-```
+    ```commandline
+    bin/metadata_server &
+    ```
 
 3) Run sqreamd worker in background
 
-```commandline
-bin/sqreamd -config <monitor_service_root_dir>/config_files/sqream_config.json &
-```
+    ```commandline
+    bin/sqreamd -config <monitor_service_root_dir>/config_files/sqream_config.json &
+    ```
 
-### 3. Run Monitor Service
+### 2. Run Monitor Service
 
 1) Go to monitor service root directory
 
-```commandline
-cd <monitor_service_root_dir>
-```
+    ```commandline
+    cd <monitor_service_root_dir>
+    ```
 
-2) Run monitor service
+2) Configure `monitor_input.json` if you need
 
-```commandline
-python monitor_service.py
-```
+    Numbers here are timeouts for monitor metric processes to send `select <metric_name>();` query
 
+    ```json
+    {
+      "show_server_status": 7,
+      "show_locks": 2,
+      "get_leveldb_stats": 5,
+      "show_cluster_nodes": 4,
+      "get_license_info": 5
+    }
+    ```
 
-## Graph (for better understanding what's happening)
+3) Run monitor service
+
+    ```commandline
+    python main.py
+    ```
+
+## Graph (WILL BE REFACTORED LATER)
 
 ```mermaid
-graph LR
-A(__main__) -->|First metric| B1[show_server_status]
-A(__main__) -->|Second metric| B2[show_locks]
-A(__main__) -->B3[...]
-A(__main__) -->|N-th metric| B4[get_leveldb_stats]
-B1 --> C(run_metric_scheduler)
-B2 --> C(run_metric_scheduler)
-B3 --> C(run_metric_scheduler)
-B4 --> C(run_metric_scheduler)
-C --> D(Thread.start
-        metric_scheduler)
-D --> E(while True:)
-E --> F(pg_monitor)
-F --> E
+graph TB
+A(python main.py) --> B[Startup checks]
+B -->|monitor_input.json| B1[check_customer_metrics]
+B --> B2[check_sqream_connection]
+B --> B3[check_sqream_on_cpu]
+B --> B4[check_loki_connection]
+B1 --> C(run_monitor)
+B2 --> C(run_monitor)
+B3 --> C(run_monitor)
+B4 --> C(run_monitor)
+C --> |show_locks| D1(Process for 1 metric)
+C --> |show_cluster_nodes| D2(Process for 2 metric)
+C --> |get_leveldb_stats| D3(Process for 3 metric)
+C --> |other metric| D4(Process for N metric)
+D1 --> E(while True:)
+D2 --> E(while True:)
+D3 --> E(while True:)
+D4 --> E(while True:)
+E --> |send query to sqream| F(fetch select `metric_name`)
+M(metrics dataclasses) --> |use metric name to get dict| G(create loki labels)
+F --> G(push logs to loki)
+G --> |POST REQUEST| H(sleep timeout)
+H --> E
 ```
 
-## Useful links:
+## Useful links
 
 * [SQreamDB documentation](https://docs.sqream.com/en/latest/)
