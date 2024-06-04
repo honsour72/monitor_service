@@ -31,7 +31,7 @@ def run_monitor(args: argparse.Namespace) -> None:
     process_crushed = Event()
     # Run process for every metric
     for metric_name, metric_timeout in metrics.items():
-        p = Process(target=schedule_process_for_metric,
+        p = Process(target=run_metric_worker,
                     args=(metric_name, metric_timeout, loki_url, process_crushed),
                     name=metric_name)
         p.start()
@@ -68,7 +68,7 @@ def terminate_metric_processes(*_, processes: list[Process] | None = None, stop_
     return None
 
 
-def schedule_process_for_metric(metric_name: str, metric_timeout: int, url: str, stop_event: Event) -> None:
+def run_metric_worker(metric_name: str, metric_timeout: int, url: str, stop_event: Event) -> None:
     """
     Main process function to receive metric data from sqream and push it to Loki instance
 
@@ -162,10 +162,18 @@ def build_payload(metric_name: str, data: dict[str, str | int]) -> dict[str, lis
     :return: special dictionary (data-raw in example above) for post request body
     """
     labels: dict[str, Any] = {"timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "job": metric_name}
-    labels.update(data)
+
+    if isinstance(data, dict):
+        labels.update(data)
+        values = [[str(int(time() * 1e9)), json.dumps(data)]]
+    else:
+        values = []
+        for row in data:
+            value = [str(int(time() * 1e9)), json.dumps(row)]
+            values.append(value)
 
     stream = {
         "stream": labels,
-        "values": [[str(int(time() * 1e9)), str(labels)]]
+        "values": values
     }
     return {"streams": [stream]}
