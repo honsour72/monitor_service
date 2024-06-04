@@ -1,12 +1,17 @@
 certifi==2024.6.2
 charset-normalizer==2.1.1
 colorlog==6.8.2
+exceptiongroup==1.2.1
 idna==3.7
+iniconfig==2.0.0
 loguru==0.7.2
 numpy==1.26.4
 packaging==24.0
+pluggy==1.5.0
 psycopg2==2.9.9
 pyarrow==16.1.0
 pysqream==5.0.0
+pytest==8.2.1
 requests==2.28.1
+tomli==2.0.1
 urllib3==1.26.6

@@ -1,9 +1,9 @@
 # SqreamDB Monitor Service
 
-![Static Badge](https://img.shields.io/badge/colorama-0.4.6-darkblue)
+![Static Badge](https://img.shields.io/badge/python-3.9-darkblue)
 ![Static Badge](https://img.shields.io/badge/numpy-1.26.4-blue)
-![Static Badge](https://img.shields.io/badge/psycopg2-2.9.9-orange)
-![Static Badge](https://img.shields.io/badge/pyarrow-16.1.0-red)
+![Static Badge](https://img.shields.io/badge/requests-2.28.1-orange)
+![Static Badge](https://img.shields.io/badge/urllib3-1.26.6-red)
 ![Static Badge](https://img.shields.io/badge/pysqream-5.0.0-yellow)
 
 Python implementation of SQreamDB monitor service.
@@ -172,9 +172,14 @@ D1 --> E(while True:)
 D2 --> E(while True:)
 D3 --> E(while True:)
 D4 --> E(while True:)
-E --> |send query to sqream| F(fetch select `metric_name`)
-F --> G(push logs to loki)
-G --> |POST REQUEST| H(sleep timeout)
+E --> |send query to sqream| F(fetch data from `select metric_name`)
+F --> |data is empty| S(skip sending to loki)
+F --> |data - list of dicts| L(for row in data)
+L --> |POST REQUEST| G
+G --> H(sleep timeout)
+F --> |data - dict| G(push logs to loki)
+G --> L
+S --> H
 H --> E
 ```
 

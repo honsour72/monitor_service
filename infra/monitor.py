@@ -71,6 +71,13 @@ def terminate_metric_processes(*_, processes: list[Process] | None = None, stop_
 def schedule_process_for_metric(metric_name: str, metric_timeout: int, url: str, stop_event: Event) -> None:
     """
     Main process function to receive metric data from sqream and push it to Loki instance
+
+    Function flow could be described like:
+    1) Execute sqream query `select <metric_name>();` and get results
+    2) If result is empty list - skip sending it to loki
+    3) If result has only one row (native dict) -> send post request as it is
+    4) If result has a lot of rows (list of dicts) -> send post request for each of them
+
     :param stop_event: multiprocessing.Event instance to keep Process working or abort it
     :param metric_name: string, metric name from `monitor_input.json`
     :param metric_timeout: float, timeout to wait after every `select <metric_name>();` query
@@ -80,15 +87,24 @@ def schedule_process_for_metric(metric_name: str, metric_timeout: int, url: str,
     log.debug(f"[{metric_name}]: process with timeout = {metric_timeout} sec started successfully")
     try:
         while not stop_event.is_set():
-            # get data from sqream
+            # 1) get data from sqream
             data = SqreamConnection.execute(f"select {metric_name}()")
+
+            # 2) If result is empty list - skip sending it to loki
             if len(data) == 0:
                 log.warning(
                     f"[{metric_name}]: sqream query `select {metric_name}();` returned 0 rows. Skip sending it to Loki")
             else:
                 log.success(f"[{metric_name}]: `select {metric_name}();` -> {len(data)} rows")
-                # send data to loki
-                push_logs_to_loki(url=url, metric_name=metric_name, data=data)
+
+                if isinstance(data, dict):
+                    # 3) If result has only one row (native dict) -> send post request as it is
+                    push_logs_to_loki(url=url, metric_name=metric_name, data=data)
+                else:
+                    # 4) If result has a lot of rows (list of dicts) -> send post request for each of them
+                    for row_number, row in enumerate(data, start=1):
+                        push_logs_to_loki(url=url, metric_name=metric_name, data=row, row_number=row_number)
+
             # sleep `metric_timeout` seconds
             sleep(metric_timeout)
     except KeyboardInterrupt:
@@ -106,41 +122,32 @@ def schedule_process_for_metric(metric_name: str, metric_timeout: int, url: str,
         return None
 
 
-def push_logs_to_loki(url: str, metric_name: str, data: list[dict[str, str | int]] | dict[str, str | int]) -> None:
+def push_logs_to_loki(url: str, metric_name: str, data: dict[str, str | int], row_number: int = 1) -> None:
     """
     Function to send post http request to loki
 
     :param url: loki endpoint to push logs (http://host:port/loki/api/v1/push)
     :param metric_name: string, metric name from `monitor_input.json`
-    :param data: list of dicts or dict with row(s) data within
+    :param data: dict with row data within, for example:
+    :param row_number: number of row just for logging
 
-    Examples:
-    1) For one row it will be one dict:
     { "server_ip": "127.0.0.1", "server_port": 5000, ... "statement_id": "node_6999" }
-    2) For many rows it will be a list with dicts inside:
-    [
-        { "write_limit": "123", "read_limit": "321", ... "license_info": "some text" },
-        ...
-        { "write_limit": "456", "read_limit": "654", ... "license_info": "other text" },
-    ]
-    3) Sometimes data maybe empty list `[]`
 
     :return: Nothing, just send post http request
     """
 
     payload = build_payload(metric_name=metric_name, data=data)
     answer = requests.post(url, json=payload, allow_redirects=False, verify=True)
+    # why 204? According to loki doc: `A 204 response indicates success.`
     if answer.status_code == 204:
-        log.success(f"[{metric_name}]: successfully sent data ({len(data)} rows) to loki")
+        log.success(f"[{metric_name}]: Loki successfully accepts data (row number: {row_number})")
     else:
         raise requests.HTTPError(f"[{metric_name}]: {answer}. Request was: "
                                  f"`curl -X POST -H 'Content-Type: application/json' --data-raw "
                                  f"'{json.dumps(payload)}' {url}`")
 
 
-def build_payload(metric_name: str,
-                  data: list[dict[str, str | int]] | dict[str, str | int]
-                  ) -> dict[str, list[dict[str, Any]]]:
+def build_payload(metric_name: str, data: dict[str, str | int]) -> dict[str, list[dict[str, Any]]]:
     """
     Examples of curl post request for pushing logs to loki:
     https://grafana.com/docs/loki/latest/reference/loki-http-api/#examples
@@ -151,24 +158,14 @@ def build_payload(metric_name: str,
         --data-raw '{"streams": [{ "stream": { "foo": "bar2" }, "values": [ [ "1570818238000000000", "fizzbuzz" ] ] }]}'
 
     :param metric_name: name of utility function used for `job` field in Loki
-    :param data: list of dicts or dict with rows data within (see `push_logs_to_loki` for examples)
+    :param data: dict with rows data within (see `push_logs_to_loki` for examples)
     :return: special dictionary (data-raw in example above) for post request body
     """
     labels: dict[str, Any] = {"timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "job": metric_name}
-
-    if isinstance(data, dict):
-        labels.update(data)
-        values = [[str(int(time() * 1e9)), str(labels)]]
-    else:
-        values = []
-        for row in data:
-            labels.update(row)
-            value = [str(int(time() * 1e9)), str(row.values())]
-            values.append(value)
+    labels.update(data)
 
     stream = {
         "stream": labels,
-        "values": values
+        "values": [[str(int(time() * 1e9)), str(labels)]]
     }
-    payload = {"streams": [stream]}
-    return payload
+    return {"streams": [stream]}
