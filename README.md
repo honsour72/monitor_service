@@ -110,7 +110,7 @@ Also, you need to be installed:
 
 2) Configure `monitor_input.json` if you need
 
-    Numbers here are timeouts for monitor metric processes to send `select <metric_name>();` query
+    Numbers here are timeouts (metrics frequency) for monitor metric processes to send `select <metric_name>();` query
 
     ```json
     {
@@ -155,19 +155,12 @@ Also, you need to be installed:
 
 ```mermaid
 graph TB
-A(python main.py) --> B[Startup checks]
-B -->|monitor_input.json| B1[check_customer_metrics]
-B --> B2[check_sqream_connection]
-B --> B3[check_sqream_on_cpu]
-B --> B4[check_loki_connection]
-B1 --> C(run_monitor)
-B2 --> C(run_monitor)
-B3 --> C(run_monitor)
-B4 --> C(run_monitor)
-C --> |show_locks| D1(Process for 1 metric)
-C --> |show_cluster_nodes| D2(Process for 2 metric)
-C --> |get_leveldb_stats| D3(Process for 3 metric)
-C --> |other metric| D4(Process for N metric)
+A(python main.py) --> |monitor_input.json| B[Startup checkups:\n1. check_customer_metrics\n2. check_sqream_connection\n3. check_sqream_on_cpu\n4. check_loki_connection]
+B --> C(run_monitor)
+C --> |show_locks| D1(Worker for 1 metric)
+C --> |show_cluster_nodes| D2(Worker for 2 metric)
+C --> |get_leveldb_stats| D3(Worker for 3 metric)
+C --> |other metric| D4(Worker for N metric)
 D1 --> E(while True:)
 D2 --> E(while True:)
 D3 --> E(while True:)

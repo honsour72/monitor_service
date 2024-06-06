@@ -11,7 +11,7 @@ from typing import Any
 import requests
 from loguru import logger as log
 
-from infra.utils import get_customer_metrics
+from infra.utils import get_customer_metrics, is_metric_should_be_send
 from infra.sqream_connection import SqreamConnection
 
 
@@ -71,6 +71,13 @@ def terminate_metric_processes(*_, processes: list[Process] | None = None, stop_
 def run_metric_worker(metric_name: str, metric_timeout: int, url: str, stop_event: Event) -> None:
     """
     Main process function to receive metric data from sqream and push it to Loki instance
+
+    Steps:
+    1) Get data from sqream
+    2) Check if this metric should be sent to Loki
+    3) Send data to loki if we need it
+    4) Sleep timeout (metric frequency)
+
     :param stop_event: multiprocessing.Event instance to keep Process working or abort it
     :param metric_name: string, metric name from `monitor_input.json`
     :param metric_timeout: float, timeout to wait after every `select <metric_name>();` query
@@ -80,16 +87,24 @@ def run_metric_worker(metric_name: str, metric_timeout: int, url: str, stop_even
     log.debug(f"[{metric_name}]: process with timeout = {metric_timeout} sec started successfully")
     try:
         while not stop_event.is_set():
-            # get data from sqream
+            # 1) Get data from sqream
             data = SqreamConnection.execute(f"select {metric_name}()")
-            if len(data) == 0:
-                log.warning(
-                    f"[{metric_name}]: sqream query `select {metric_name}();` returned 0 rows. Skip sending it to Loki")
+
+            # 2) Check if this metric should be sent to Loki
+            if is_metric_should_be_send(metric_name=metric_name):
+
+                if len(data) == 0:
+                    log.warning(
+                        f"[{metric_name}]: sqream query `select {metric_name}();` returned 0 rows. Skip sending it to Loki")
+                else:
+                    log.success(f"[{metric_name}]: `select {metric_name}();` -> {len(data)} rows")
+                    # 3) Send data to loki if we need it
+                    push_logs_to_loki(url=url, metric_name=metric_name, data=data)
+
             else:
-                log.success(f"[{metric_name}]: `select {metric_name}();` -> {len(data)} rows")
-                # send data to loki
-                push_logs_to_loki(url=url, metric_name=metric_name, data=data)
-            # sleep `metric_timeout` seconds
+                log.info(f"[{metric_name}]: shouldn't be sent to Loki")
+
+            # 4) Sleep timeout (metric frequency)
             sleep(metric_timeout)
     except KeyboardInterrupt:
         log.info(f"[{metric_name}]: Process interrupted by user. Stop all metrics")

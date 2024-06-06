@@ -11,13 +11,16 @@ from loguru import logger as log
 
 from infra.sqream_connection import SqreamConnection
 
-_ALLOWED_METRICS = (
-    "show_server_status",
-    "show_locks",
-    "get_leveldb_stats",
-    "show_cluster_nodes",
-    "get_license_info",
-)
+# Since SQ-17798 we DO NOT need to send some metrics to loki (reset_leveldb_stats)
+# Details: https://sqream.atlassian.net/browse/SQ-17798
+_ALLOWED_METRICS = {
+    "show_server_status": {"send_to_loki": True},
+    "show_locks": {"send_to_loki": True},
+    "get_leveldb_stats": {"send_to_loki": True},
+    "show_cluster_nodes": {"send_to_loki": True},
+    "get_license_info": {"send_to_loki": True},
+    "reset_leveldb_stats": {"send_to_loki": False},
+}
 
 
 def get_command_line_arguments() -> argparse.Namespace:
@@ -142,6 +145,10 @@ def check_loki_connection(url: str) -> None:
     if response.status_code != 200:
         raise ValueError(msg)
     log.success(f"Loki connection established successfully.")
+
+
+def is_metric_should_be_send(metric_name: str) -> bool:
+    return _ALLOWED_METRICS[metric_name]["send_to_loki"]
 
 
 def safe(with_trace: bool = False) -> Callable[[Callable[[], Any]], Callable[[], Any]]:
