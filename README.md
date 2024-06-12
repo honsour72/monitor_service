@@ -8,18 +8,17 @@
 
 ## Contents
 
-1. [Overview](#overview)
-   1. [Description](#description)
-   2. [Quick start](#quick-start)
-   3. [Requirements](#requirements)
-   4. [Architecture](#architecture)
-2. [Configuration](#configuration)
-   1. [Configure project environment](#configure-project-environment)
-   2. [Configure sqream non-GPU worker](#configure-sqream-non-gpu-worker)
-   3. [Configure monitor service](#configure-monitor-service)
-3. [Monitor service command-line arguments reference](#monitor-service-command-line-arguments-reference)
-4. [Service working cycle graph](#service-execution-plan-graph)
-5. [Useful links](#useful-links)
+1. [Overview](#1-overview)
+   1. [Description](#11-description)
+   2. [Quick start](#12-quick-start)
+   3. [Requirements](#13-requirements)
+   4. [Architecture](#14-architecture)
+2. [Configuration](#2-configuration)
+   1. [Configure sqream non-GPU worker](#21-configure-sqream-non-gpu-worker)
+   2. [Configure project environment](#22-configure-monitor-service)
+3. [Monitor service command-line arguments reference](#3-monitor-service-command-line-arguments-reference)
+4. [Service working cycle graph](#4-service-execution-plan-graph)
+5. [Useful links](#5-useful-links)
 
 ## 1. Overview
 
@@ -62,15 +61,15 @@ to catch an errors, unexpected behaviors or something else.
 
 3. Finally monitor service push data to loki via `HTTP POST request`:
 
-    ```commandline
-    curl -X POST -H "Content-Type: application/json" "http://localhost:3100/loki/api/v1/push" \
-   --data-raw '{"streams": [{ "stream": { "metric_name": "utility_function_example" }, "values": [ [ "1570818238000000000", { "number": 1, "worker_name": "foo", "worker_value": 5 } ] ] }]}'    
+    ```
+    curl -X POST -H "Content-Type: application/json" "http://localhost:3100/loki/api/v1/push" --data-raw \
+        '{"streams": [{ "stream": { "metric_name": "utility_function_example" }, "values": [ [ "1570818238000000000", { "number": 1, "worker_name": "foo", "worker_value": 5 } ] ] }]}'    
     ```
 
 ### 1.2 Quick start
 
 > [!NOTE] 
-> All flags will be presented at [command-line arguments reference](#monitor-service-command-line-arguments-reference) 
+> All flags will be presented at [command-line arguments reference](#3-monitor-service-command-line-arguments-reference) 
 
 ```commandline
 python main.py  --host=127.0.0.1 --port=5000 --database=master --username=sqream --password=sqream --service=monitor --loki_host=127.0.0.1 --loki_port=3100
@@ -97,41 +96,17 @@ L --> G(<h3>Grafana</h3>observability solution)
 
 ## 2. Configuration
 
-### 2.1 Configure project environment
-
-1. Create virtual environment
-
-    ```commandline
-    python3.9 -m venv .venv
-    ```
-
-2. Activate virtual environment
-
-    ```commandline
-    source .venv/bin/activate
-    ```
-
-3. Install requirements
-
-    ```commandline
-    pip install -r requirements.txt
-    ```
-   
-4. Run tests
-   
-   ```commandline
-   pytest -v
-   ```
-
-### 2.2 Configure sqream non-GPU worker
+### 2.1 Configure sqream non-GPU worker
 
 > [!IMPORTANT]
-> Don't forget to add `cluster` and `licensePath` fields into `sqream_config.json` configuration file
+> Don't forget to change `cluster` and `licensePath` fields in the `sqream_config.json` configuration file
 
 Example of `sqream_config.json`
 
 ```json
 {
+    "cluster": "path/to/your/cluster/",
+    "licensePath": "path/to/your/license.enc",
     "cudaMemQuota":0,
     "gpu": 0,
     "legacyConfigFilePath": "sqream_config_legacy.json",
@@ -169,30 +144,61 @@ Example of `sqream_config_legacy.json`
 1) Go to sqream package directory
 
     ```commandline
-    cd <sqream_package_dir>
+    cd sqream/package/dir
     ```
 
 2) Run metadata_server in background
 
     ```commandline
-    bin/metadata_server &
+    ./bin/metadata_server &
     ```
 
 3) Run sqreamd worker in background
 
     ```commandline
-    bin/sqreamd -config <monitor_service_root_dir>/config_files/sqream_config.json &
+    ./bin/sqreamd -config path/to/sqreamdb-monitor-service/config_files/sqream_config.json &
     ```
 
-### 2.3 Configure Monitor Service
 
-1) Go to monitor service root directory
+### 2.2 Configure monitor service
+
+1. Clone git repository
+   
+   ```commandline
+   git clone git@github.com:SQream/sqreamdb-monitor-service.git   
+   ```
+
+2. Go to cloned project directory
+
+   ```commandline
+   cd sqreamdb-monitor-service
+   ```
+
+3. Create virtual environment
 
     ```commandline
-    cd <monitor_service_root_dir>
+    python3.9 -m venv .venv
     ```
 
-2) Configure `monitor_input.json` if you need
+4. Activate virtual environment
+
+    ```commandline
+    source .venv/bin/activate
+    ```
+
+5. Install requirements
+
+    ```commandline
+    pip install -r requirements.txt
+    ```
+   
+6. Run tests
+   
+   ```commandline
+   pytest -v
+   ```
+   
+7. Configure `monitor_input.json` if you need
 
     Numbers here are seconds timeouts (metrics frequency) for monitor metric processes to send `select <metric_name>();` query
 
@@ -207,7 +213,7 @@ Example of `sqream_config_legacy.json`
     }
     ```
 
-3) Run monitor service
+8. Run monitor service
 
     ```commandline
     python main.py
