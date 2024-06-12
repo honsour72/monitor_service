@@ -24,7 +24,7 @@ _ALLOWED_METRICS = {
 
 
 def get_command_line_arguments() -> argparse.Namespace:
-    """usage: main.py [-h --help] [--host] [--port] [--database] [--user] [--password] [--clustered] [--service]
+    """usage: main.py [-h --help] [--host] [--port] [--database] [--username] [--password] [--clustered] [--service]
                       [--loki_host] [--loki_port] [--log_file_path]
 
     Command-line interface for monitor-service project
@@ -34,7 +34,7 @@ def get_command_line_arguments() -> argparse.Namespace:
       --host                Sqream ip address (default: `localhost`)
       --port                Sqream port (default: `5000`)
       --database            Sqream database (default: `master`)
-      --user                Sqream user (default: `sqream`)
+      --username            Sqream username (default: `sqream`)
       --password            Sqream password (default: `sqream`)
       --clustered           Sqream clustered (default: `False`)
       --service             Sqream service (default: `monitor`)
@@ -44,11 +44,12 @@ def get_command_line_arguments() -> argparse.Namespace:
 
     :return: argparse.Namespace with parsed arguments
     """
+    
     parser = argparse.ArgumentParser(description="Command-line interface for monitor-service project")
     parser.add_argument("--host", type=str, help="Sqream ip address", default="localhost")
     parser.add_argument("--port", type=int, help="Specify Sqream port", default=5000)
     parser.add_argument("--database", type=str, help="Specify Sqream database", default="master")
-    parser.add_argument("--user", type=str, help="Specify Sqream user", default="sqream")
+    parser.add_argument("--username", type=str, help="Specify Sqream username", default="sqream")
     parser.add_argument("--password", type=str, help="Specify Sqream password", default="sqream")
     parser.add_argument("--clustered", action="store_true", help="Specify Sqream clustered")
     parser.add_argument("--service", type=str, help="Sqream service (default: `monitor`)",
@@ -66,6 +67,7 @@ def add_log_sink(log_file_path: str | None = None) -> None:
     :param log_file_path: string - path for logs file
     :return: None
     """
+
     if log_file_path is not None:
         log.info(f"Logs also will be provided to {log_file_path}")
         log.add(log_file_path)
@@ -110,13 +112,13 @@ def get_customer_metrics(metrics_json_path: str | None = None) -> dict[str, int]
 
 def check_sqream_connection(args: argparse.Namespace) -> None:
     try:
-        SqreamConnection(host=args.host, port=args.port, database=args.database, user=args.user,
+        SqreamConnection(host=args.host, port=args.port, database=args.database, user=args.username,
                          password=args.password, clustered=args.clustered, service=args.service)
     except ConnectionRefusedError as connection_err:
         # except and raise it here because native exception text (`Connection refused, perhaps wrong IP?`)
         # isn't enough to understand the issue
         raise ConnectionRefusedError(f"Can not establish connection to sqream database `{args.database}` on "
-                                     f"{args.host}:{args.port}. Credentials were: user=`{args.user}`, "
+                                     f"{args.host}:{args.port}. Credentials were: user=`{args.username}`, "
                                      f"password=`{args.password}` (clustered = `{args.clustered}`) "
                                      f"Service: {args.service}. Source exception is: {connection_err}")
     else:
@@ -131,6 +133,7 @@ def check_sqream_on_cpu(host: str, port: int) -> None:
     :param port: sqreamd (server picker) port to establish connection
     :return: None
     """
+
     try:
         SqreamConnection.execute("select 1")
     except Exception:

@@ -7,6 +7,7 @@ from time import sleep, time
 from datetime import datetime
 from multiprocessing import Process, Event
 from typing import Any
+from urllib3.exceptions import NewConnectionError
 
 import requests
 from loguru import logger as log
@@ -21,6 +22,7 @@ def run_monitor(args: argparse.Namespace) -> None:
     :param args: sequence of command-line arguments
     :return: None
     """
+
     loki_url = f"http://{args.loki_host}:{args.loki_port}/loki/api/v1/push"
     # collect customer metrics from `monitor_input.json`
     metrics = get_customer_metrics()
@@ -58,6 +60,7 @@ def terminate_metric_processes(*_, processes: list[Process] | None = None, stop_
     :param processes: list of `multiprocessing.Process` instances
     :return: None
     """
+
     if stop_event is not None:
         stop_event.set()
     if processes is not None:
@@ -65,7 +68,6 @@ def terminate_metric_processes(*_, processes: list[Process] | None = None, stop_
         for process in processes:
             process.terminate()
             log.info(f"Process `{process.name}` terminated successfully")
-    return None
 
 
 def run_metric_worker(metric_name: str, metric_timeout: int, url: str, stop_event: Event) -> None:
@@ -84,6 +86,7 @@ def run_metric_worker(metric_name: str, metric_timeout: int, url: str, stop_even
     :param url: loki specific endpoint to push logs
     :return: None
     """
+
     log.debug(f"[{metric_name}]: process with timeout = {metric_timeout} sec started successfully")
     try:
         while not stop_event.is_set():
@@ -94,8 +97,8 @@ def run_metric_worker(metric_name: str, metric_timeout: int, url: str, stop_even
             if is_metric_should_be_send(metric_name=metric_name):
 
                 if len(data) == 0:
-                    log.warning(
-                        f"[{metric_name}]: sqream query `select {metric_name}();` returned 0 rows. Skip sending it to Loki")
+                    log.warning(f"[{metric_name}]: sqream query `select {metric_name}();`"
+                                f" returned 0 rows. Skip sending it to Loki")
                 else:
                     log.success(f"[{metric_name}]: `select {metric_name}();` -> {len(data)} rows")
                     # 3) Send data to loki if we need it
@@ -108,7 +111,7 @@ def run_metric_worker(metric_name: str, metric_timeout: int, url: str, stop_even
             sleep(metric_timeout)
     except KeyboardInterrupt:
         log.info(f"[{metric_name}]: Process interrupted by user. Stop all metrics")
-    except requests.HTTPError as loki_lost_connection:
+    except (requests.HTTPError, NewConnectionError) as loki_lost_connection:
         log.error(f"[{metric_name}]: Connection to loki was lost. Stop all metrics. "
                   f"(Native error: {loki_lost_connection})")
     except ConnectionRefusedError as sq_lost_connection:
@@ -118,7 +121,6 @@ def run_metric_worker(metric_name: str, metric_timeout: int, url: str, stop_even
         log.exception(unhandled_exception)
     finally:
         stop_event.set()
-        return None
 
 
 def push_logs_to_loki(url: str, metric_name: str, data: list[dict[str, str | int]] | dict[str, str | int]) -> None:
@@ -169,6 +171,7 @@ def build_payload(metric_name: str,
     :param data: list of dicts or dict with rows data within (see `push_logs_to_loki` for examples)
     :return: special dictionary (data-raw in example above) for post request body
     """
+
     labels: dict[str, Any] = {"timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "job": metric_name}
 
     if isinstance(data, dict):

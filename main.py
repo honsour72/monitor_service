@@ -23,7 +23,7 @@ def main() -> None:
     4) Run monitor service is everything is ok, raise an exception otherwise
 
     usage: main.py [-h --help] [--host] [--port] [--database]
-                   [--user] [--password] [--clustered] [--service]
+                   [--username] [--password] [--clustered] [--service]
                    [--loki_host] [--loki_port] [--log_file_path]
 
     Command-line interface for monitor-service project
@@ -33,7 +33,7 @@ def main() -> None:
       --host                Sqream ip address (default: `localhost`)
       --port                Sqream port (default: `5000`)
       --database            Sqream database (default: `master`)
-      --user                Sqream user (default: `sqream`)
+      --username            Sqream username (default: `sqream`)
       --password            Sqream password (default: `sqream`)
       --clustered           Sqream clustered (default: `False`)
       --service             Sqream service (default: `monitor`)
@@ -43,6 +43,7 @@ def main() -> None:
 
     :return: None
     """
+
     # 1. Read arguments from command-line
     args = get_command_line_arguments()
     # 2. Add sink to logger if provided

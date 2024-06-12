@@ -6,15 +6,98 @@
 ![Static Badge](https://img.shields.io/badge/urllib3-1.26.6-red)
 ![Static Badge](https://img.shields.io/badge/pysqream-5.0.0-yellow)
 
-Python implementation of SQreamDB monitor service.
+## Contents
 
-Python version: 3.9
+1. [Overview](#overview)
+   1. [Description](#description)
+   2. [Quick start](#quick-start)
+   3. [Requirements](#requirements)
+   4. [Architecture](#architecture)
+2. [Configuration](#configuration)
+   1. [Configure project environment](#configure-project-environment)
+   2. [Configure sqream non-GPU worker](#configure-sqream-non-gpu-worker)
+   3. [Configure monitor service](#configure-monitor-service)
+3. [Monitor service command-line arguments reference](#monitor-service-command-line-arguments-reference)
+4. [Service working cycle graph](#service-execution-plan-graph)
+5. [Useful links](#useful-links)
 
-Also, you need to be installed:
+## 1. Overview
+
+### 1.1 Description
+
+Monitor service was developed as a part of [RCA (Root Cause Analysis)](https://sqream.atlassian.net/wiki/spaces/PRODUCT/pages/2962784261/SQDB+Root+Cause+Analysis+PRD) 
+for observe customer's sqream infrastructure\
+In general, monitor service sends utility function queries to sqream <u>CPU worker</u>,get results and push them <u>loki instance</u>.\
+Data from Loki can be obtained and used by any observability systems (such as [Grafana](https://grafana.com/)) 
+to catch an errors, unexpected behaviors or something else.
+
+**Flow example:**
+
+1. First of all, after you ran monitor service, it sends utility function query to sqream instance:
+    
+    ```sql
+    select utility_function_example();
+    ```
+
+    which returns something like:
+
+    ```
+    | number | worker name | worker value |
+    | 1      | foo         | 5            |
+    | 2      | bar         | 2            |
+                    . . .
+    | N      | span        | 10           |
+    ```
+
+2. When result was fetched, monitor service convert it into array with mappings, like:
+
+    ```
+    [
+        { "number": 1, "worker_name": "foo", "worker_value": 5 }
+        { "number": 2, "worker_name": "bar", "worker_value": 2 }
+                           .    .   .   .   .
+        { "number": N, "worker_name": "span", "worker_value": 10 }
+    ]
+    ```
+
+3. Finally monitor service push data to loki via `HTTP POST request`:
+
+    ```commandline
+    curl -X POST -H "Content-Type: application/json" "http://localhost:3100/loki/api/v1/push" \
+   --data-raw '{"streams": [{ "stream": { "metric_name": "utility_function_example" }, "values": [ [ "1570818238000000000", { "number": 1, "worker_name": "foo", "worker_value": 5 } ] ] }]}'    
+    ```
+
+### 1.2 Quick start
+
+> [!NOTE] 
+> All flags will be presented at [command-line arguments reference](#monitor-service-command-line-arguments-reference) 
+
+```commandline
+python main.py  --host=127.0.0.1 --port=5000 --database=master --username=sqream --password=sqream --service=monitor --loki_host=127.0.0.1 --loki_port=3100
+```
+
+### 1.3 Requirements
+
+* Python version: 3.9
+* [Pip's requirements](./requirements.txt)
 * [Grafana](https://roman-academy.medium.com/how-to-install-and-configure-grafana-on-centos-7-56c28dc04840)
 * [Loki](https://grafana.com/docs/loki/latest/setup/install/)
 
-## How to configure project environment
+### 1.4 Architecture
+
+Here is a simple representation of monitor service components
+
+```mermaid
+graph TB
+Sqream(CPU Sqreamd worker) --> UF(<h3>Utility functions:</h3><ol><li>show_locks</li><li>show_cluster_nodes</li><li>get_leveldb_stats</li><li>others</li></ol>)
+UF --> |metrics| M(<h3>Monitor service:</h3><ol><li><p>get queries from sqreamd</p></li><li><p>send result to Loki</p></li></ol>)
+M --> |HTTP POST| L(<h3>Loki</h3>stores logs and index it)
+L --> G(<h3>Grafana</h3>observability solution)
+```
+
+## 2. Configuration
+
+### 2.1 Configure project environment
 
 1. Create virtual environment
 
@@ -25,7 +108,7 @@ Also, you need to be installed:
 2. Activate virtual environment
 
     ```commandline
-    . .venv/bin/activate
+    source .venv/bin/activate
     ```
 
 3. Install requirements
@@ -40,11 +123,12 @@ Also, you need to be installed:
    pytest -v
    ```
 
-## How to trigger Monitor service
+### 2.2 Configure sqream non-GPU worker
 
-### 1. Start monitor worker (no-GPU resource)
+> [!IMPORTANT]
+> Don't forget to add `cluster` and `licensePath` fields into `sqream_config.json` configuration file
 
-`sqream_config.json`
+Example of `sqream_config.json`
 
 ```json
 {
@@ -60,7 +144,7 @@ Also, you need to be installed:
 }
 ```
 
-`sqream_config_legacy.json`
+Example of `sqream_config_legacy.json`
 
 ```json
 {
@@ -100,7 +184,7 @@ Also, you need to be installed:
     bin/sqreamd -config <monitor_service_root_dir>/config_files/sqream_config.json &
     ```
 
-### 2. Run Monitor Service
+### 2.3 Configure Monitor Service
 
 1) Go to monitor service root directory
 
@@ -110,7 +194,7 @@ Also, you need to be installed:
 
 2) Configure `monitor_input.json` if you need
 
-    Numbers here are timeouts (metrics frequency) for monitor metric processes to send `select <metric_name>();` query
+    Numbers here are seconds timeouts (metrics frequency) for monitor metric processes to send `select <metric_name>();` query
 
     ```json
     {
@@ -118,7 +202,8 @@ Also, you need to be installed:
       "show_locks": 2,
       "get_leveldb_stats": 5,
       "show_cluster_nodes": 4,
-      "get_license_info": 5
+      "get_license_info": 5,
+      "reset_leveldb_stats": 86400
     }
     ```
 
@@ -128,7 +213,7 @@ Also, you need to be installed:
     python main.py
     ```
 
-## Monitor service command-line interface
+## 3. Monitor service command-line arguments reference
 
 > All arguments below are optional and could be a `flag` or an `option`\
 > If argument is a `flag` you need to provide value, like: `--host=127.0.0.1` or `--host 192.168.0.1`\
@@ -142,7 +227,7 @@ Also, you need to be installed:
 | 2  | `--host`          | string  | Sqream host address                | `localhost` |
 | 3  | `--port`          | integer | Sqream port                        | `5000`      |
 | 4  | `--database`      | string  | Sqream database name               | `master`    |
-| 5  | `--user`          | string  | Sqream username                    | `sqream`    |
+| 5  | `--username`      | string  | Sqream username                    | `sqream`    |
 | 6  | `--password`      | string  | Sqream password                    | `sqream`    |
 | 7  | `--clustered`     | option  | Option if server_picker is running | `False`     |
 | 8  | `--service`       | string  | Sqream service name                | `monitor`   |
@@ -151,7 +236,7 @@ Also, you need to be installed:
 | 11 | `--log_file_path` | string  | Path to file to store logs         | `None`      |
 
 
-## Graph
+## 4. Service execution plan graph
 
 ```mermaid
 graph TB
@@ -173,8 +258,9 @@ S --> H
 H --> E
 ```
 
-## Useful links
+## 5. Useful links
 
+* [Root Cause Analysis](https://sqream.atlassian.net/wiki/spaces/PRODUCT/pages/2962784261/SQDB+Root+Cause+Analysis+PRD)
 * [SQreamDB documentation](https://docs.sqream.com/en/latest/)
 * [Grafana installation guide](https://roman-academy.medium.com/how-to-install-and-configure-grafana-on-centos-7-56c28dc04840)
 * [Loki installation guide](https://grafana.com/docs/loki/latest/setup/install/)

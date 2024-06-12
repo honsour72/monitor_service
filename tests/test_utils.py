@@ -92,7 +92,7 @@ class TestUtils:
             os.remove(self.temp_log_name)
 
     @pytest.mark.parametrize(
-        ("host", "port", "database", "user", "password", "service", "clustered", "exception"),
+        ("host", "port", "database", "username", "password", "service", "clustered", "exception"),
         (
                 ("wrong_host", 5000, "master", "sqream", "sqream", "monitor", False,
                  "Name or service not known"),
@@ -116,13 +116,13 @@ class TestUtils:
              "wrong_password", "wrong_service", "clustered=True")
     )
     def test_negative_check_sqream_connection(
-            self, host, port, database, user, password, service, clustered, exception
+            self, host, port, database, username, password, service, clustered, exception
     ):
         args = argparse.Namespace()
         args.host = host
         args.port = port
         args.database = database
-        args.user = user
+        args.username = username
         args.password = password
         args.service = service
         args.clustered = clustered
