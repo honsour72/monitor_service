@@ -194,9 +194,9 @@ Example of `sqream_config_legacy.json`
    
 6. Run tests
    
-   > [!INFO]
-   > Full test coverage of monitor service will be presented at [Testing Framework](https://github.com/SQream/testing_framework/tree/michaelr-monitor-service/integration_test/tests/functionality/suites/mbb/scripts)
-   > Cases here from [tests](tests/test_utils.py) created without any test plan only for utility functions
+> [!WARNING] 
+> Full test coverage of monitor service will be presented at [Testing Framework](https://github.com/SQream/testing_framework/tree/michaelr-monitor-service/integration_test/tests/functionality/suites/mbb/scripts)\
+> Cases here from [tests](tests/test_utils.py) created without any test plan only for utility functions
    
    ```commandline
    pytest -v
