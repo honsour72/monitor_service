@@ -26,7 +26,7 @@
 
 Monitor service was developed as a part of [RCA (Root Cause Analysis)](https://sqream.atlassian.net/wiki/spaces/PRODUCT/pages/2962784261/SQDB+Root+Cause+Analysis+PRD) 
 for observe customer's sqream infrastructure\
-In general, monitor service sends utility function queries to sqream <u>CPU worker</u>,get results and push them <u>loki instance</u>.\
+In general, monitor service sends utility function queries to sqream <u>CPU worker</u>, get results and push them to <u>loki instance</u>.\
 Data from Loki can be obtained and used by any observability systems (such as [Grafana](https://grafana.com/)) 
 to catch an errors, unexpected behaviors or something else.
 
@@ -78,8 +78,8 @@ python main.py  --host=127.0.0.1 --port=5000 --database=master --username=sqream
 ### 1.3 Requirements
 
 * Python version: 3.9
+* [Sqream CPU instance](#21-configure-sqream-non-gpu-worker)
 * [Pip's requirements](./requirements.txt)
-* [Grafana](https://roman-academy.medium.com/how-to-install-and-configure-grafana-on-centos-7-56c28dc04840)
 * [Loki](https://grafana.com/docs/loki/latest/setup/install/)
 
 ### 1.4 Architecture
@@ -193,6 +193,10 @@ Example of `sqream_config_legacy.json`
     ```
    
 6. Run tests
+   
+   > [!INFO]
+   > Full test coverage of monitor service will be presented at [Testing Framework](https://github.com/SQream/testing_framework/tree/michaelr-monitor-service/integration_test/tests/functionality/suites/mbb/scripts)
+   > Cases here from [tests](tests/test_utils.py) created without any test plan only for utility functions
    
    ```commandline
    pytest -v

@@ -102,7 +102,7 @@ def run_metric_worker(metric_name: str, metric_timeout: int, url: str, stop_even
                 else:
                     log.success(f"[{metric_name}]: `select {metric_name}();` -> {len(data)} rows")
                     # 3) Send data to loki if we need it
-                    push_logs_to_loki(url=url, metric_name=metric_name, data=data)
+                    push_logs_to_loki(url=url, metric_name=metric_name, metric_timeout=metric_timeout, data=data)
 
             else:
                 log.info(f"[{metric_name}]: shouldn't be sent to Loki")
@@ -123,12 +123,16 @@ def run_metric_worker(metric_name: str, metric_timeout: int, url: str, stop_even
         stop_event.set()
 
 
-def push_logs_to_loki(url: str, metric_name: str, data: list[dict[str, str | int]] | dict[str, str | int]) -> None:
+def push_logs_to_loki(url: str,
+                      metric_name: str,
+                      metric_timeout: int,
+                      data: list[dict[str, str | int]] | dict[str, str | int]) -> None:
     """
     Function to send post http request to loki
 
+    :param metric_timeout: frequency - just a label for loki storage
     :param url: loki endpoint to push logs (http://host:port/loki/api/v1/push)
-    :param metric_name: string, metric name from `monitor_input.json`
+    :param metric_name: string, metric name from `monitor_input.json` for labels in loki storage
     :param data: list of dicts or dict with row(s) data within
 
     Examples:
@@ -145,7 +149,7 @@ def push_logs_to_loki(url: str, metric_name: str, data: list[dict[str, str | int
     :return: Nothing, just send post http request
     """
 
-    payload = build_payload(metric_name=metric_name, data=data)
+    payload = build_payload(metric_name=metric_name, metric_timeout=metric_timeout, data=data)
     answer = requests.post(url, json=payload, allow_redirects=False, verify=True)
     if answer.status_code == 204:
         log.success(f"[{metric_name}]: Loki successfully accepts {len(data)} rows")
@@ -156,6 +160,7 @@ def push_logs_to_loki(url: str, metric_name: str, data: list[dict[str, str | int
 
 
 def build_payload(metric_name: str,
+                  metric_timeout: int,
                   data: list[dict[str, str | int]] | dict[str, str | int]
                   ) -> dict[str, list[dict[str, Any]]]:
     """
@@ -167,12 +172,26 @@ def build_payload(metric_name: str,
     curl -H "Content-Type: application/json" -s -X POST "http://localhost:3100/loki/api/v1/push" \
         --data-raw '{"streams": [{ "stream": { "foo": "bar2" }, "values": [ [ "1570818238000000000", "fizzbuzz" ] ] }]}'
 
+    It will send to loki one line: `fizzbuzz` with the timestamp `1570818238000000000` and label `foo=bar2`
+    You also can send multiple lines but with only one labels mapping
+
+    For our case every batch sending to loki will have:
+    - `timestamp`
+    - `metric_name` as `job`
+    - `metric_timeout` as `response_time`
+
+    Any utility functions return one row (which will be converted to dict{filed:value})
+    will additional have `fields` as labels (provided by `labels.update(data)` code below)
+
+    :param metric_timeout: frequency, how often utility function <metric_name> will be triggered
     :param metric_name: name of utility function used for `job` field in Loki
     :param data: list of dicts or dict with rows data within (see `push_logs_to_loki` for examples)
     :return: special dictionary (data-raw in example above) for post request body
     """
 
-    labels: dict[str, Any] = {"timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "job": metric_name}
+    labels: dict[str, Any] = {"timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                              "job": metric_name,
+                              "response_time": metric_timeout}
 
     if isinstance(data, dict):
         labels.update(data)
