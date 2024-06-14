@@ -204,7 +204,8 @@ Example of `sqream_config_legacy.json`
    
 7. Configure `monitor_input.json` if you need
 
-    Numbers here are seconds timeouts (metrics frequency) for monitor metric processes to send `select <metric_name>();` query
+    Numbers here are timeouts - frequency for monitor to send `select <metric_name>();` query
+    It should be non-negative and greater than zero 
 
     ```json
     {

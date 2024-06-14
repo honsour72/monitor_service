@@ -100,6 +100,9 @@ def check_customer_metrics() -> None:
             float(metric_timeout)
         except ValueError:
             raise ValueError(f"Can not convert metric `{customer_metric}` value `{metric_timeout}` to `float` type")
+        if metric_timeout <= 0:
+            raise ValueError(f"Metric `{customer_metric}` timeout = {metric_timeout}. "
+                             f"It can not be negative or equal zero")
     log.success("All metrics are validated and allowed")
 
 

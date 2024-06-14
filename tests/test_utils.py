@@ -38,7 +38,6 @@ class TestUtils:
 
         os.rename(monitor_input_json, self.monitor_input_json_temp_name)
 
-        # os.system(f"python main.py --log_file_path={self.temp_log_name}")
         exit_code = call(["python", "main.py", f"--log_file_path={self.temp_log_name}"])
         assert exit_code == 1, f"monitor service expected exit code = 1, got {exit_code}"
 
@@ -57,7 +56,6 @@ class TestUtils:
 
         os.system(f"touch {monitor_input_json}")
 
-        # os.system(f"python main.py --log_file_path={self.temp_log_name}")
         exit_code = call(["python", "main.py", f"--log_file_path={self.temp_log_name}"])
         assert exit_code == 1, f"monitor service expected exit code = 1, got {exit_code}"
 
@@ -77,8 +75,11 @@ class TestUtils:
             ({"wrong_metric": 1}, "Metric `wrong_metric` from `monitor_input.json` isn't allowed."),
             ({"show_locks": 2, "wrong_metric": 1}, "Metric `wrong_metric` from `monitor_input.json` isn't allowed."),
             ({"show_locks": "wrong_value"}, "Can not convert metric `show_locks` value `wrong_value` to `float` type"),
+            ({"show_locks": -5}, "Metric `show_locks` timeout = -5. It can not be negative or equal zero"),
+            ({"get_license_info": 0}, "Metric `get_license_info` timeout = 0. It can not be negative or equal zero"),
         ),
-        ids=("wrong_metric", "allowed_metric_and_wrong_metric", "allowed_metric_wrong_value")
+        ids=("wrong_metric", "allowed_metric_and_wrong_metric", "allowed_metric_wrong_value",
+             "allowed_metric_negative_value", "allowed_metric_zero_value")
     )
     def test_negative_not_allowed_metric_or_value(self, monitor_input_json, metrics, expected_error):
         os.rename(monitor_input_json, self.monitor_input_json_temp_name)
@@ -86,7 +87,6 @@ class TestUtils:
         with open(monitor_input_json, 'w') as new_monitor_json:
             new_monitor_json.write(json.dumps(metrics))
 
-        # os.system(f"python main.py --log_file_path={self.temp_log_name}")
         exit_code = call(["python", "main.py", f"--log_file_path={self.temp_log_name}"])
         assert exit_code == 1, f"monitor service expected exit code = 1, got {exit_code}"
 
