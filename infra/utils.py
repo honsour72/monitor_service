@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import os.path
+import sys
 from functools import wraps
 from typing import Any, Callable
 
@@ -98,7 +99,7 @@ def check_customer_metrics() -> None:
             float(metric_timeout)
         except ValueError:
             raise ValueError(f"Can not convert metric `{customer_metric}` value `{metric_timeout}` to `float` type")
-    log.success(f"All metrics are validated and allowed")
+    log.success("All metrics are validated and allowed")
 
 
 def get_customer_metrics(metrics_json_path: str | None = None) -> dict[str, int]:
@@ -137,7 +138,7 @@ def check_sqream_on_cpu(host: str, port: int) -> None:
     try:
         SqreamConnection.execute("select 1")
     except Exception:
-        log.success(f"Query `select 1` raises `Internal Runtime Error` which means sqream is running on CPU.")
+        log.success("Query `select 1` raises `Internal Runtime Error` which means sqream is running on CPU.")
     else:
         raise TypeError(f"sqreamd on `{host}:{port}` works on GPU instead of CPU")
 
@@ -147,7 +148,7 @@ def check_loki_connection(url: str) -> None:
     msg = f"Request `curl -X GET {url}` returns status_code = {response.status_code}"
     if response.status_code != 200:
         raise ValueError(msg)
-    log.success(f"Loki connection established successfully.")
+    log.success("Loki connection established successfully.")
 
 
 def is_metric_should_be_send(metric_name: str) -> bool:
@@ -166,5 +167,6 @@ def safe(with_trace: bool = False) -> Callable[[Callable[[], Any]], Callable[[],
                     log.exception(handled_exception)
                 else:
                     log.error(handled_exception)
+                sys.exit(1)
         return wrapper
     return decorator

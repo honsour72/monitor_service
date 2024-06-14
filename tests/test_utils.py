@@ -2,6 +2,7 @@ import argparse
 import json
 import os
 import re
+from subprocess import call
 
 import pytest
 from loguru import logger as log
@@ -37,7 +38,9 @@ class TestUtils:
 
         os.rename(monitor_input_json, self.monitor_input_json_temp_name)
 
-        os.system(f"python main.py --log_file_path={self.temp_log_name}")
+        # os.system(f"python main.py --log_file_path={self.temp_log_name}")
+        exit_code = call(["python", "main.py", f"--log_file_path={self.temp_log_name}"])
+        assert exit_code == 1, f"monitor service expected exit code = 1, got {exit_code}"
 
         content = self.read_log_file_content(self.temp_log_name)
 
@@ -54,7 +57,9 @@ class TestUtils:
 
         os.system(f"touch {monitor_input_json}")
 
-        os.system(f"python main.py --log_file_path={self.temp_log_name}")
+        # os.system(f"python main.py --log_file_path={self.temp_log_name}")
+        exit_code = call(["python", "main.py", f"--log_file_path={self.temp_log_name}"])
+        assert exit_code == 1, f"monitor service expected exit code = 1, got {exit_code}"
 
         content = self.read_log_file_content(self.temp_log_name)
 
@@ -81,7 +86,9 @@ class TestUtils:
         with open(monitor_input_json, 'w') as new_monitor_json:
             new_monitor_json.write(json.dumps(metrics))
 
-        os.system(f"python main.py --log_file_path={self.temp_log_name}")
+        # os.system(f"python main.py --log_file_path={self.temp_log_name}")
+        exit_code = call(["python", "main.py", f"--log_file_path={self.temp_log_name}"])
+        assert exit_code == 1, f"monitor service expected exit code = 1, got {exit_code}"
 
         content = self.read_log_file_content(self.temp_log_name)
 
