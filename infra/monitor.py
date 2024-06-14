@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import signal
+import sys
 from time import sleep, time
 from datetime import datetime
 from multiprocessing import Process, Event
@@ -119,6 +120,7 @@ def run_metric_worker(metric_name: str, metric_timeout: int, url: str, stop_even
                   f"(Native error: {sq_lost_connection})")
     except Exception as unhandled_exception:
         log.exception(unhandled_exception)
+        sys.exit(2)
     finally:
         stop_event.set()
 
