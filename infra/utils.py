@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import argparse
 import json
-import os.path
 import sys
+
 from functools import wraps
 from typing import Any, Callable
+from pathlib import Path
 
 import requests
 from loguru import logger as log
@@ -104,7 +105,17 @@ def check_customer_metrics() -> None:
 
 def get_customer_metrics(metrics_json_path: str | None = None) -> dict[str, int]:
     if metrics_json_path is None:
-        metrics_json_path = os.path.join(os.getcwd(), "monitor_input.json")
+        # Here we need to get absolute path of `monitor_input.json`
+        # regardless of directory from which we start `main.py`
+
+        # For example, if we run `python main.py` from /home/sqreamdb-monitor-service with os.getcwd(),
+        # we will get path like `/home/sqreamdb-monitor-service/monitor_input.json`
+        # Or if we do the same command but from `/home` directory,
+        # we will get = `/home/monitor_input.json` which is wrong
+
+        # for that reason we can not use `os.getcwd()` here and use `Path('utils.py').parent.parent`
+        # to make it `reverse-relative`
+        metrics_json_path = Path(__file__).parent.parent / "monitor_input.json"
 
     with open(metrics_json_path) as json_file:
         metrics = json.load(json_file)
