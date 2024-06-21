@@ -6,8 +6,9 @@ from subprocess import call
 import pytest
 from loguru import logger as log
 
-from infra.utils import add_log_sink, check_sqream_connection, check_loki_connection
 from infra.sqream_connection import SqreamConnection
+from infra.startups import check_loki_connection, check_sqream_connection
+from infra.utils import add_log_sink
 
 
 class TestUtils:
@@ -79,12 +80,12 @@ class TestUtils:
             ({"get_license_info": 0}, "Metric `get_license_info` timeout = 0. It can not be negative or equal zero"),
         ),
         ids=("wrong_metric", "allowed_metric_and_wrong_metric", "allowed_metric_wrong_value",
-             "allowed_metric_negative_value", "allowed_metric_zero_value")
+             "allowed_metric_negative_value", "allowed_metric_zero_value"),
     )
     def test_negative_not_allowed_metric_or_value(self, monitor_input_json, metrics, expected_error):
         os.rename(monitor_input_json, self.monitor_input_json_temp_name)
 
-        with open(monitor_input_json, 'w') as new_monitor_json:
+        with open(monitor_input_json, "w") as new_monitor_json:
             new_monitor_json.write(json.dumps(metrics))
 
         exit_code = call(["python", "main.py", "--username=sqream", "--password=sqream",
@@ -111,7 +112,7 @@ class TestUtils:
                 ("localhost", 5000, "flomaster", "sqream", "sqream", "monitor", False,
                  "Database flomaster no longer exists"),
                 ("localhost", 5000, "master", "ne_sqream", "sqream", "monitor", False,
-                 "Error connecting to database: Login failure: role \'ne_sqream\' doesn\'t exist"),
+                 "Error connecting to database: Login failure: role 'ne_sqream' doesn't exist"),
                 ("localhost", 5000, "master", "sqream", "wrong_password", "monitor", False,
                  "Error connecting to database: "),
                 ("localhost", 5000, "master", "sqream", "sqream", "wrong_service?", False,
@@ -121,10 +122,10 @@ class TestUtils:
                  "Connected with clustered=True, but apparently not a server picker port"),
         ),
         ids=("wrong_host", "wrong_port", "taken_port", "wrong_dbname", "wrong_username",
-             "wrong_password", "wrong_service", "clustered=True")
+             "wrong_password", "wrong_service", "clustered=True"),
     )
     def test_negative_check_sqream_connection(
-            self, host, port, database, username, password, service, clustered, exception
+            self, host, port, database, username, password, service, clustered, exception,
     ):
 
         with pytest.raises(Exception) as sqream_connection_error:
@@ -141,7 +142,7 @@ class TestUtils:
             "http://localhost:8000",
             "http://wrong:5432",
         ),
-        ids=("wrong_host_ok_port", "ok_host_wrong_port", "wrong_host_wrong_port")
+        ids=("wrong_host_ok_port", "ok_host_wrong_port", "wrong_host_wrong_port"),
     )
     def test_negative_check_loki_connection(self, url: str):
         with pytest.raises(Exception) as loki_exception:
