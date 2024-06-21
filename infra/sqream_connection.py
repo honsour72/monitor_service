@@ -19,7 +19,8 @@ class SqreamConnection:
 
     @staticmethod
     def execute(query: str, fetch: Literal["one", "all"] = "all") -> list[dict[str, int | str]] | dict[str | int]:
-        """:param query: sqream query to execute
+        """
+        :param query: sqream query to execute, e.g. `select show_locks()`
         :param fetch: possible way to get rows: `all` or `one`. Default - `all`
         :return: list of dicts (many rows) - for fetchall, dict (one row) - for fetchone
 
@@ -50,6 +51,7 @@ class SqreamConnection:
         For this reason I use `replace(" ", "_")` to change spaces on underscore sign before result
 
         """
+
         with SqreamConnection.connection.cursor() as cursor:
             cursor.execute(query)
             if fetch == "one":

@@ -23,18 +23,20 @@ def main() -> None:
     4) Run monitor service is everything is ok, raise an exception otherwise
 
     usage: main.py [-h --help] [--host] [--port] [--database]
-                   [--username] [--password] [--clustered] [--service]
+                   --username --password [--clustered] [--service]
                    [--loki_host] [--loki_port] [--log_file_path]
 
     Command-line interface for monitor-service project
+
+    required arguments:
+      --username            Sqream database username
+      --password            Sqream database password
 
     optional arguments:
       -h, --help            show this help message and exit
       --host                Sqream ip address (default: `localhost`)
       --port                Sqream port (default: `5000`)
       --database            Sqream database (default: `master`)
-      --username            Sqream username (default: `sqream`)
-      --password            Sqream password (default: `sqream`)
       --clustered           Sqream clustered (default: `False`)
       --service             Sqream service (default: `monitor`)
       --loki_host           Loki remote address (default: `localhost`)
@@ -60,7 +62,7 @@ def main() -> None:
                         loki_port=args.loki_port
                         )
     # 4. Run monitor service is everything is ok, raise an exception otherwise
-    run_monitor(args)
+    run_monitor(loki_host=args.loki_host, loki_port=args.loki_port)
 
 
 if __name__ == "__main__":

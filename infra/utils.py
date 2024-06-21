@@ -49,7 +49,10 @@ def get_command_line_arguments() -> argparse.Namespace:
     :return: argparse.Namespace with parsed arguments
     """
 
-    parser = argparse.ArgumentParser(description="Command-line interface for monitor-service project")
+    parser = argparse.ArgumentParser(prog='Sqream monitor service',
+                                     description="Developer as a part of RCA (Root Cause Analysis) "
+                                                 "for observe customer's sqream infrastructure",
+                                     epilog='Developed by Michael Rogozin (michaelr@sqreamtech.com)')
     parser.add_argument("--username", type=str, help="Specify Sqream username", required=True)
     parser.add_argument("--password", type=str, help="Specify Sqream password", required=True)
     parser.add_argument("--host", type=str, help="Sqream ip address", default="localhost")

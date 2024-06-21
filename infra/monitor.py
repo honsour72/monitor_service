@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import argparse
 import json
 import signal
 import sys
@@ -17,14 +16,15 @@ from infra.utils import get_customer_metrics, is_metric_should_be_send
 from infra.sqream_connection import SqreamConnection
 
 
-def run_monitor(args: argparse.Namespace) -> None:
+def run_monitor(loki_host: str, loki_port: int) -> None:
     """
     Main function for run monitor service, especially `multiprocessing.Process` for every metric
-    :param args: sequence of command-line arguments
+    :param loki_port: specified host of loki instance
+    :param loki_host: specified port of loki instance
     :return: None
     """
 
-    loki_url = f"http://{args.loki_host}:{args.loki_port}/loki/api/v1/push"
+    loki_url = f"http://{loki_host}:{loki_port}/loki/api/v1/push"
     # collect customer metrics from `monitor_input.json`
     metrics = get_customer_metrics()
     log.info(f"Starting {len(metrics)} processes for metrics: {', '.join(metrics.keys())}")
