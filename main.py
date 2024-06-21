@@ -49,7 +49,16 @@ def main() -> None:
     # 2. Add sink to logger if provided
     add_log_sink(args.log_file_path)
     # 3. Do checkups (are metrics allowed, is connection established)
-    do_startup_checkups(args)
+    do_startup_checkups(username=args.username,
+                        password=args.password,
+                        host=args.host,
+                        port=args.port,
+                        database=args.database,
+                        clustered=args.clustered,
+                        service=args.service,
+                        loki_host=args.loki_host,
+                        loki_port=args.loki_port
+                        )
     # 4. Run monitor service is everything is ok, raise an exception otherwise
     run_monitor(args)
 
