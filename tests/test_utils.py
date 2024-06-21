@@ -12,7 +12,7 @@ from infra.sqream_connection import SqreamConnection
 
 
 class TestUtils:
-    monitor_input_json_temp_name = "temp.json"
+    monitor_input_json_temp_name = "monitor_input_temp.json"
     temp_log_name = "temp.log"
 
     @staticmethod
@@ -38,12 +38,12 @@ class TestUtils:
 
         os.rename(monitor_input_json, self.monitor_input_json_temp_name)
 
-        exit_code = call(["python", "main.py", f"--log_file_path={self.temp_log_name}"])
-        assert exit_code == 1, f"monitor service expected exit code = 1, got {exit_code}"
-
+        exit_code = call(["python", "main.py", "--username=sqream", "--password=sqream",
+                          f"--log_file_path={self.temp_log_name}"])
         content = self.read_log_file_content(self.temp_log_name)
 
         try:
+            assert exit_code == 1, f"monitor service expected exit code = 1, got {exit_code}"
             assert re.search(r"ERROR.+No such file or directory:.+monitor_input\.json", content), (
                 "No ERROR line about `monitor_input.json` in logs"
             )
@@ -56,7 +56,8 @@ class TestUtils:
 
         os.system(f"touch {monitor_input_json}")
 
-        exit_code = call(["python", "main.py", f"--log_file_path={self.temp_log_name}"])
+        exit_code = call(["python", "main.py", "--username=sqream", "--password=sqream",
+                          f"--log_file_path={self.temp_log_name}"])
         assert exit_code == 1, f"monitor service expected exit code = 1, got {exit_code}"
 
         content = self.read_log_file_content(self.temp_log_name)
@@ -87,7 +88,8 @@ class TestUtils:
         with open(monitor_input_json, 'w') as new_monitor_json:
             new_monitor_json.write(json.dumps(metrics))
 
-        exit_code = call(["python", "main.py", f"--log_file_path={self.temp_log_name}"])
+        exit_code = call(["python", "main.py", "--username=sqream", "--password=sqream",
+                          f"--log_file_path={self.temp_log_name}"])
         assert exit_code == 1, f"monitor service expected exit code = 1, got {exit_code}"
 
         content = self.read_log_file_content(self.temp_log_name)
@@ -125,17 +127,10 @@ class TestUtils:
     def test_negative_check_sqream_connection(
             self, host, port, database, username, password, service, clustered, exception
     ):
-        args = argparse.Namespace()
-        args.host = host
-        args.port = port
-        args.database = database
-        args.username = username
-        args.password = password
-        args.service = service
-        args.clustered = clustered
 
         with pytest.raises(Exception) as sqream_connection_error:
-            check_sqream_connection(args)
+            check_sqream_connection(host=host, port=port, username=username, password=password,
+                                    clustered=clustered, service=service, database=database)
         assert exception in str(sqream_connection_error)
 
         SqreamConnection.close()

@@ -59,7 +59,7 @@ to catch an errors, unexpected behaviors or something else.
     ]
     ```
 
-3. Finally monitor service push data to loki via `HTTP POST request`:
+3. Finally, monitor service push data to loki via `HTTP POST request` (`request` library in python):
 
     ```
     curl -X POST -H "Content-Type: application/json" "http://localhost:3100/loki/api/v1/push" --data-raw \
@@ -221,7 +221,7 @@ Example of `sqream_config_legacy.json`
 8. Run monitor service
 
     ```commandline
-    python main.py
+    python main.py --username=sqream --password=sqream
     ```
 
 ## 3. Monitor service command-line arguments reference
@@ -232,19 +232,19 @@ Example of `sqream_config_legacy.json`
 > For example if you put `option` `-h` or `--help` it will be recognized as `True` if you don't do it - `False`
 
 
-| #  | view              | type    | description                        | default     |
-|----|-------------------|---------|------------------------------------|-------------|
-| 1  | `-h` `--help`     | option  | show help message                  | `-`         |
-| 2  | `--host`          | string  | Sqream host address                | `localhost` |
-| 3  | `--port`          | integer | Sqream port                        | `5000`      |
-| 4  | `--database`      | string  | Sqream database name               | `master`    |
-| 5  | `--username`      | string  | Sqream username                    | `sqream`    |
-| 6  | `--password`      | string  | Sqream password                    | `sqream`    |
-| 7  | `--clustered`     | option  | Option if server_picker is running | `False`     |
-| 8  | `--service`       | string  | Sqream service name                | `monitor`   |
-| 9  | `--loki_host`     | string  | Loki instance host address         | `localhost` |
-| 10 | `--loki_port`     | integer | Loki instance port                 | `3100`      |
-| 11 | `--log_file_path` | string  | Path to file to store logs         | `None`      |
+| #  | view              | required | type    | description                        | default     |
+|----|-------------------|----------|---------|------------------------------------|-------------|
+| 1  | `-h` `--help`     |          | option  | show help message                  | `-`         |
+| 2  | `--host`          |          | string  | Sqream host address                | `localhost` |
+| 3  | `--port`          |          | integer | Sqream port                        | `5000`      |
+| 4  | `--database`      |          | string  | Sqream database name               | `master`    |
+| 5  | `--username`      | ✅        | string  | Sqream username                    | `sqream`    |
+| 6  | `--password`      | ✅        | string  | Sqream password                    | `sqream`    |
+| 7  | `--clustered`     |          | option  | Option if server_picker is running | `False`     |
+| 8  | `--service`       |          | string  | Sqream service name                | `monitor`   |
+| 9  | `--loki_host`     |          | string  | Loki instance host address         | `localhost` |
+| 10 | `--loki_port`     |          | integer | Loki instance port                 | `3100`      |
+| 11 | `--log_file_path` |          | string  | Path to file to store logs         | `None`      |
 
 
 ## 4. Service execution plan graph

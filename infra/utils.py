@@ -26,18 +26,20 @@ _ALLOWED_METRICS = {
 
 
 def get_command_line_arguments() -> argparse.Namespace:
-    """usage: main.py [-h --help] [--host] [--port] [--database] [--username] [--password] [--clustered] [--service]
+    """usage: main.py [-h --help] [--host] [--port] [--database] --username --password [--clustered] [--service]
                       [--loki_host] [--loki_port] [--log_file_path]
 
     Command-line interface for monitor-service project
+
+    required arguments:
+      --username            Sqream database username
+      --password            Sqream database password
 
     optional arguments:
       -h, --help            show this help message and exit
       --host                Sqream ip address (default: `localhost`)
       --port                Sqream port (default: `5000`)
       --database            Sqream database (default: `master`)
-      --username            Sqream username (default: `sqream`)
-      --password            Sqream password (default: `sqream`)
       --clustered           Sqream clustered (default: `False`)
       --service             Sqream service (default: `monitor`)
       --loki_host           Loki remote address (default: `localhost`)
@@ -46,16 +48,15 @@ def get_command_line_arguments() -> argparse.Namespace:
 
     :return: argparse.Namespace with parsed arguments
     """
-    
+
     parser = argparse.ArgumentParser(description="Command-line interface for monitor-service project")
+    parser.add_argument("--username", type=str, help="Specify Sqream username", required=True)
+    parser.add_argument("--password", type=str, help="Specify Sqream password", required=True)
     parser.add_argument("--host", type=str, help="Sqream ip address", default="localhost")
     parser.add_argument("--port", type=int, help="Specify Sqream port", default=5000)
     parser.add_argument("--database", type=str, help="Specify Sqream database", default="master")
-    parser.add_argument("--username", type=str, help="Specify Sqream username", default="sqream")
-    parser.add_argument("--password", type=str, help="Specify Sqream password", default="sqream")
     parser.add_argument("--clustered", action="store_true", help="Specify Sqream clustered")
-    parser.add_argument("--service", type=str, help="Sqream service (default: `monitor`)",
-                        default="monitor")
+    parser.add_argument("--service", type=str, help="Sqream service (default: `monitor`)", default="monitor")
     parser.add_argument("--loki_host", type=str, help="Loki remote address", default="127.0.0.1")
     parser.add_argument("--loki_port", type=int, help="Loki remote port", default="3100")
     parser.add_argument("--log_file_path", type=str, help="Name of file to store logs", default=None)
@@ -75,16 +76,24 @@ def add_log_sink(log_file_path: str | None = None) -> None:
         log.add(log_file_path)
 
 
-def do_startup_checkups(args: argparse.Namespace) -> None:
+def do_startup_checkups(host: str,
+                        port: int,
+                        database: str,
+                        username: str,
+                        password: str,
+                        clustered: bool,
+                        service: str,
+                        loki_host: str,
+                        loki_port: int) -> None:
     log.info("Starting checkups...")
     # 1. Check all customer metrics are allowed
     check_customer_metrics()
     # 2. Check sqream connection is established
-    check_sqream_connection(args)
+    check_sqream_connection(host, port, database, username, password, clustered, service)
     # 3. Check sqream is working on CPU and not on GPU
-    check_sqream_on_cpu(host=args.host, port=args.port)
+    check_sqream_on_cpu(host=host, port=port)
     # 4. Check Loki's connection is established
-    check_loki_connection(url=f"http://{args.loki_host}:{args.loki_port}/metrics")
+    check_loki_connection(url=f"http://{loki_host}:{loki_port}/metrics")
 
 
 def check_customer_metrics() -> None:
@@ -125,17 +134,24 @@ def get_customer_metrics(metrics_json_path: str | None = None) -> dict[str, int]
         return metrics
 
 
-def check_sqream_connection(args: argparse.Namespace) -> None:
+def check_sqream_connection(host: str,
+                            port: int,
+                            database: str,
+                            username: str,
+                            password: str,
+                            clustered: bool,
+                            service: str
+                            ) -> None:
     try:
-        SqreamConnection(host=args.host, port=args.port, database=args.database, user=args.username,
-                         password=args.password, clustered=args.clustered, service=args.service)
+        SqreamConnection(host=host, port=port, database=database, user=username, password=password,
+                         clustered=clustered, service=service)
     except ConnectionRefusedError as connection_err:
         # except and raise it here because native exception text (`Connection refused, perhaps wrong IP?`)
         # isn't enough to understand the issue
-        raise ConnectionRefusedError(f"Can not establish connection to sqream database `{args.database}` on "
-                                     f"{args.host}:{args.port}. Credentials were: user=`{args.username}`, "
-                                     f"password=`{args.password}` (clustered = `{args.clustered}`) "
-                                     f"Service: {args.service}. Source exception is: {connection_err}")
+        raise ConnectionRefusedError(f"Can not establish connection to sqream database `{database}` on "
+                                     f"{host}:{port}. Credentials were: user=`{username}`, "
+                                     f"password=`{password}` (clustered = `{clustered}`) "
+                                     f"Service: {service}. Source exception is: {connection_err!r}")
     else:
         log.success("Sqream connection established successfully")
 
@@ -182,5 +198,7 @@ def safe(with_trace: bool = False) -> Callable[[Callable[[], Any]], Callable[[],
                 else:
                     log.error(handled_exception)
                 sys.exit(1)
+
         return wrapper
+
     return decorator
