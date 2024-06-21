@@ -1,11 +1,7 @@
 """Main monitor service module."""
 from infra.monitor import run_monitor
-from infra.utils import (
-    add_log_sink,
-    do_startup_checkups,
-    get_command_line_arguments,
-    safe,
-)
+from infra.startups import do_startup_checkups
+from infra.utils import add_log_sink, get_command_line_arguments, safe
 
 
 @safe()
@@ -59,7 +55,7 @@ def main() -> None:
                         clustered=args.clustered,
                         service=args.service,
                         loki_host=args.loki_host,
-                        loki_port=args.loki_port
+                        loki_port=args.loki_port,
                         )
     # 4. Run monitor service is everything is ok, raise an exception otherwise
     run_monitor(loki_host=args.loki_host, loki_port=args.loki_port)
