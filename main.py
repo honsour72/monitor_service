@@ -1,26 +1,22 @@
 """Main monitor service module."""
-from infra.monitor import run_monitor
-from infra.startups import do_startup_checkups
-from infra.utils import add_log_sink, get_command_line_arguments, safe
+import sys
+
+from loguru import logger as log
+from infra.utils import add_log_sink, get_command_line_arguments
+from infra.monitor import MonitorService
 
 
-@safe()
 def main() -> None:
     """Run monitor service.
 
     Put `with_trace=True` into `safe` decorator like `safe(with_trace=True)`
     to see all tracebacks for debugging. You can find all allowed metrics
-    (sqreamd utility functions) in ./infra/utils.py
+    (sqreamd utility functions) in ./infra/monitor.py
 
     Steps below:
     1) Read arguments from command-line
     2) Add sink to logger if provided
-    3) Do checkups (are metrics allowed, is connection established)
-    4) Run monitor service is everything is ok, raise an exception otherwise
-
-    usage: main.py [-h --help] [--host] [--port] [--database]
-                   --username --password [--clustered] [--service]
-                   [--loki_host] [--loki_port] [--log_file_path]
+    3) Initialize monitor service (check customer metrics, connections) and run it
 
     Command-line interface for monitor-service project
 
@@ -46,19 +42,12 @@ def main() -> None:
     args = get_command_line_arguments()
     # 2. Add sink to logger if provided
     add_log_sink(args.log_file_path)
-    # 3. Do checkups (are metrics allowed, is connection established)
-    do_startup_checkups(username=args.username,
-                        password=args.password,
-                        host=args.host,
-                        port=args.port,
-                        database=args.database,
-                        clustered=args.clustered,
-                        service=args.service,
-                        loki_host=args.loki_host,
-                        loki_port=args.loki_port,
-                        )
-    # 4. Run monitor service is everything is ok, raise an exception otherwise
-    run_monitor(loki_host=args.loki_host, loki_port=args.loki_port)
+    # 3. Initialize monitor service (check customer metrics, connections) and run it
+    try:
+        MonitorService(**vars(args)).run()
+    except Exception as handled_exception:
+        log.exception(handled_exception)
+        sys.exit(2)
 
 
 if __name__ == "__main__":

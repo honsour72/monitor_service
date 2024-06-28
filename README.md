@@ -251,8 +251,8 @@ Example of `sqream_config_legacy.json`
 
 ```mermaid
 graph TB
-A(python main.py) --> |monitor_input.json| B[Startup checkups:\n1. check_customer_metrics\n2. check_sqream_connection\n3. check_sqream_on_cpu\n4. check_loki_connection]
-B --> C(run_monitor)
+A(python main.py) --> B[initialize MonitorService class with checkups\nand call run method]
+B --> C(Initialize workers for every metric:)
 C --> |show_locks| D1(Worker for 1 metric)
 C --> |show_cluster_nodes| D2(Worker for 2 metric)
 C --> |get_leveldb_stats| D3(Worker for 3 metric)

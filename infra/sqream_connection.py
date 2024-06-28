@@ -11,17 +11,24 @@ from infra.utils import timeit
 class SqreamConnection:
     """Representation of sqream connection class."""
 
+    host: str | None = None
+    port: int | None = None
+    username: str | None = None
+    password: str | None = None
+    database: str | None = None
+    clustered: bool | None = None
+    service: str | None = None
     connection: Connection | None = None
 
-    def __new__(cls, host: str, port: int, database: str, user: str, password: str, clustered: bool, service: str):
-        if cls.connection is None:
-            cls.connection = pysqream.connect(host=host, port=port, database=database, username=user, password=password,
-                                              clustered=clustered, service=service)
-        return cls
+    def __init__(self, host: str, port: int, database: str, username: str, password: str, clustered: bool, service: str):
+        if self.connection is None:
+            self.connection = pysqream.connect(host=host, port=port, database=database, username=username,
+                                               password=password, clustered=clustered, service=service)
 
-    @staticmethod
-    @timeit()
-    def execute(query: str, fetch: Literal["one", "all"] = "all") -> list[dict[str, int | str]] | dict[str | int]:
+    def execute(self,
+                query: str,
+                fetch: Literal["one", "all"] = "all"
+                ) -> tuple[list[dict[str, int | str]], float] | tuple[dict[str | int], float]:
         """:param query: sqream query to execute, e.g. `select show_locks()`
         :param fetch: possible way to get rows: `all` or `one`. Default - `all`
         :return: list of dicts (many rows) - for fetchall, dict (one row) - for fetchone
@@ -53,22 +60,24 @@ class SqreamConnection:
         For this reason I use `replace(" ", "_")` to change spaces on underscore sign before result
 
         """
-        with SqreamConnection.connection.cursor() as cursor:
-            cursor.execute(query)
+        with timeit() as elapsed_time:
+            with self.connection.cursor() as cursor:
+                cursor.execute(query)
+                if fetch == "one":
+                    result = cursor.fetchone()
+                else:
+                    result = cursor.fetchall()
+
+            if result is None:
+                return [], elapsed_time()
+
             if fetch == "one":
-                result = cursor.fetchone()
-            else:
-                result = cursor.fetchall()
+                return ({col_name.replace(" ", "_"): value for col_name, value in zip(cursor.col_names, result)},
+                        elapsed_time())
 
-        if result is None:
-            return []
+            return [{col_name.replace(" ", "_"): value for col_name, value in zip(cursor.col_names, row)}
+                    for row in result], elapsed_time()
 
-        if fetch == "one":
-            return {col_name.replace(" ", "_"): value for col_name, value in zip(cursor.col_names, result)}
-
-        return [{col_name.replace(" ", "_"): value for col_name, value in zip(cursor.col_names, row)} for row in result]
-
-    @staticmethod
-    def close() -> None:
-        if SqreamConnection.connection is not None and not SqreamConnection.connection.con_closed:
-            SqreamConnection.connection.close_connection()
+    def close(self) -> None:
+        if self.connection is not None and not self.connection.con_closed:
+            self.connection.close_connection()

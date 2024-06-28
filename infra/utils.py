@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import argparse
-import sys
-from functools import wraps
-from time import time
-from typing import Any, Callable
+from contextlib import contextmanager
+from multiprocessing import Process, Event
+from time import perf_counter
+from typing import Callable
 
 from loguru import logger as log
+
+
+class SqreamUtilityFunctionTimeExceeded(Exception):
+    """Execution time of utility function has exceeded"""
 
 
 def get_command_line_arguments() -> argparse.Namespace:
@@ -61,49 +65,26 @@ def add_log_sink(log_file_path: str | None = None) -> None:
         log.add(log_file_path)
 
 
-def safe(with_trace: bool = False) -> Callable[[Callable[[], Any]], Callable[[], Any]]:
-    def decorator(func: Callable) -> Callable[[], Any]:
-
-        @wraps(func)
-        def wrapper(*args, **kwargs) -> Any:
-            try:
-                return func(*args, **kwargs)
-            except Exception as handled_exception:
-                if with_trace:
-                    log.exception(handled_exception)
-                else:
-                    log.error(handled_exception)
-                sys.exit(1)
-
-        return wrapper
-
-    return decorator
+@contextmanager
+def timeit(execution_seconds_limit: int = 3600) -> Callable[[], float]:
+    start = perf_counter()
+    yield lambda: perf_counter() - start
+    if perf_counter() - start > execution_seconds_limit:
+        raise SqreamUtilityFunctionTimeExceeded("Execution time exceeds {} seconds".format(execution_seconds_limit))
 
 
-def timeit(execution_seconds_limit: int = 3600) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
-    """This decorator will time function execution and check:
-    if it greater than `execution_seconds_limit` parameter, then raise an TimeoutException
-    otherwise it will adjust `func` functionality to return time execution in seconds
-
-    Resolves:
-    * SQ-17912: https://sqream.atlassian.net/browse/SQ-17912
-    * Sq-17913: https://sqream.atlassian.net/browse/SQ-17913
-
-    :param execution_seconds_limit: timeout in seconds, decorator will raise an exception after reaching it
-    :return: other decorator since it is a decorator with parameter :)
+def terminate_metric_processes(*_, processes: list[Process] | None = None, stop_event: Event | None = None) -> None:
+    """Handler for killing multiprocessing processes if program was interrupted (ctrl+c pressed)
+    or in case of unhandled exception
+    :param stop_event: multiprocessing.Event class for set it to prevent other processes work
+    :param _: signal and frame - mandatory for `signal.signal` - removed here, because we just need to kill everything
+    :param processes: list of `multiprocessing.Process` instances
+    :return: None
     """
-    def decorator(func: Callable) -> Callable[[], Any]:
-
-        @wraps(func)
-        def wrapper(*args, **kwargs) -> tuple[Any, float]:
-            start = time()
-            result = func(*args, **kwargs)
-            finish = time() - start
-
-            if finish > execution_seconds_limit:
-                raise TimeoutError(f"Execution of `{func.__name__}` function has reached the limit of time: "
-                                   f"`{execution_seconds_limit}` in seconds. Arguments was: {args!r}, {kwargs!r}")
-            return result, round(finish, 2)
-
-        return wrapper
-    return decorator
+    if stop_event is not None:
+        stop_event.set()
+    if processes is not None:
+        log.info(f"Killing all ({len(processes)}) processes")
+        for process in processes:
+            process.terminate()
+            log.info(f"Process `{process.name}` terminated successfully")

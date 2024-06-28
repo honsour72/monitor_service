@@ -7,7 +7,6 @@ import pytest
 from loguru import logger as log
 
 from infra.sqream_connection import SqreamConnection
-from infra.startups import check_loki_connection, check_sqream_connection
 from infra.utils import add_log_sink
 
 
@@ -43,7 +42,7 @@ class TestUtils:
         content = self.read_log_file_content(self.temp_log_name)
 
         try:
-            assert exit_code == 1, f"monitor service expected exit code = 1, got {exit_code}"
+            assert exit_code == 2, f"monitor service expected exit code = 1, got {exit_code}"
             assert re.search(r"ERROR.+No such file or directory:.+monitor_input\.json", content), (
                 "No ERROR line about `monitor_input.json` in logs"
             )
@@ -58,7 +57,7 @@ class TestUtils:
 
         exit_code = call(["python", "main.py", "--username=sqream", "--password=sqream",
                           f"--log_file_path={self.temp_log_name}"])
-        assert exit_code == 1, f"monitor service expected exit code = 1, got {exit_code}"
+        assert exit_code == 2, f"monitor service expected exit code = 1, got {exit_code}"
 
         content = self.read_log_file_content(self.temp_log_name)
 
@@ -90,7 +89,7 @@ class TestUtils:
 
         exit_code = call(["python", "main.py", "--username=sqream", "--password=sqream",
                           f"--log_file_path={self.temp_log_name}"])
-        assert exit_code == 1, f"monitor service expected exit code = 1, got {exit_code}"
+        assert exit_code == 2, f"monitor service expected exit code = 1, got {exit_code}"
 
         content = self.read_log_file_content(self.temp_log_name)
 
@@ -108,7 +107,7 @@ class TestUtils:
                 ("localhost", "wrong_port", "master", "sqream", "sqream", "monitor", False,
                  "an integer is required (got type str)"),
                 ("localhost", 8000, "master", "sqream", "sqream", "monitor", False,
-                 "Can not establish connection to sqream"),
+                 "Connection refused, perhaps wrong IP?"),
                 ("localhost", 5000, "flomaster", "sqream", "sqream", "monitor", False,
                  "Database flomaster no longer exists"),
                 ("localhost", 5000, "master", "ne_sqream", "sqream", "monitor", False,
@@ -129,22 +128,6 @@ class TestUtils:
     ):
 
         with pytest.raises(Exception) as sqream_connection_error:
-            check_sqream_connection(host=host, port=port, username=username, password=password,
-                                    clustered=clustered, service=service, database=database)
+            SqreamConnection(host=host, port=port, username=username, password=password,
+                             clustered=clustered, service=service, database=database)
         assert exception in str(sqream_connection_error)
-
-        SqreamConnection.close()
-
-    @pytest.mark.parametrize(
-        "url",
-        (
-            "http://wrong_host:3100/what",
-            "http://localhost:8000",
-            "http://wrong:5432",
-        ),
-        ids=("wrong_host_ok_port", "ok_host_wrong_port", "wrong_host_wrong_port"),
-    )
-    def test_negative_check_loki_connection(self, url: str):
-        with pytest.raises(Exception) as loki_exception:
-            check_loki_connection(url)
-        assert "Max retries exceeded with url" in str(loki_exception)
